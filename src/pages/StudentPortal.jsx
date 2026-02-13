@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
     User, Calendar, Award, BarChart3, BookOpen,
-    LogOut, TrendingUp, Clock, DollarSign, CheckCircle, XCircle
+    LogOut, TrendingUp, DollarSign, CheckCircle, XCircle
 } from 'lucide-react';
 
 const StudentPortal = ({ student, studentsData, setIsLoggedIn, setCurrentPage, setLoggedInStudent }) => {
@@ -75,7 +75,6 @@ const StudentPortal = ({ student, studentsData, setIsLoggedIn, setCurrentPage, s
                             { id: 'overview', label: 'Overview', icon: BarChart3 },
                             { id: 'results', label: 'Results', icon: Award },
                             { id: 'attendance', label: 'Attendance', icon: Calendar },
-                            { id: 'schedule', label: 'Schedule', icon: Clock },
                             { id: 'fees', label: 'Fee Status', icon: DollarSign }
                         ].map((tab) => (
                             <button
@@ -330,48 +329,6 @@ const StudentPortal = ({ student, studentsData, setIsLoggedIn, setCurrentPage, s
                         </div>
                     )}
 
-                    {/* Schedule Tab */}
-                    {activeTab === 'schedule' && (
-                        <div className="animate-fade-in">
-                            <h2 style={{
-                                fontSize: '1.75rem',
-                                fontWeight: 'var(--font-weight-bold)',
-                                marginBottom: '1.5rem'
-                            }}>
-                                Weekly Schedule
-                            </h2>
-
-                            <div className="flex-col gap-2">
-                                {liveStudent.schedule.map((day, idx) => (
-                                    <div key={idx} className="card">
-                                        <h3 style={{
-                                            fontSize: '1.25rem',
-                                            fontWeight: 'var(--font-weight-bold)',
-                                            marginBottom: '1rem',
-                                            color: 'var(--color-primary)'
-                                        }}>
-                                            {day.day}
-                                        </h3>
-                                        <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
-                                            {day.periods.map((period, pIdx) => (
-                                                <div
-                                                    key={pIdx}
-                                                    className="badge"
-                                                    style={{
-                                                        background: period === 'Break' ? 'var(--color-accent)' : 'var(--color-gray-200)',
-                                                        color: period === 'Break' ? 'white' : 'var(--color-gray-900)',
-                                                        padding: '0.5rem 1rem'
-                                                    }}
-                                                >
-                                                    Period {pIdx + 1}: {period}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
 
                     {/* Fee Status Tab */}
                     {activeTab === 'fees' && (

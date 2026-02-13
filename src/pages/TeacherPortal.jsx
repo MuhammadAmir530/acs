@@ -15,6 +15,7 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage, studentsData, setStudents
     const [saveMessage, setSaveMessage] = useState('');
     const attendanceFileRef = useRef(null);
     const marksFileRef = useRef(null);
+    const feeFileRef = useRef(null);
 
     // Initialize students data from schoolData on first load
     useEffect(() => {
@@ -256,6 +257,60 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage, studentsData, setStudents
         showSaveMessage(`Fee status updated to ${newStatus} for ${student.name}!`);
     };
 
+    // --- FEE EXCEL EXPORT ---
+    const exportFeeExcel = () => {
+        const rows = students.map(s => ({
+            'Student ID': s.id,
+            'Student Name': s.name,
+            'Grade': s.grade,
+            'Fee Status (Paid/Unpaid)': s.feeStatus === 'paid' ? 'Paid' : 'Unpaid'
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws['!cols'] = [
+            { wch: 12 }, { wch: 25 }, { wch: 10 }, { wch: 24 }
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Fee Status');
+        XLSX.writeFile(wb, 'Fee_Status.xlsx');
+        showSaveMessage('Fee status exported to Excel!');
+    };
+
+    // --- FEE EXCEL IMPORT ---
+    const importFeeExcel = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const wb = XLSX.read(evt.target.result, { type: 'binary' });
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                const data = XLSX.utils.sheet_to_json(ws);
+
+                let updateCount = 0;
+                const updatedStudents = students.map(s => {
+                    const row = data.find(r => r['Student ID'] === s.id);
+                    if (row && row['Fee Status (Paid/Unpaid)']) {
+                        const status = row['Fee Status (Paid/Unpaid)'].toString().toLowerCase().trim();
+                        if (status === 'paid' || status === 'p') {
+                            updateCount++;
+                            return { ...s, feeStatus: 'paid' };
+                        } else if (status === 'unpaid' || status === 'u') {
+                            updateCount++;
+                            return { ...s, feeStatus: 'unpaid' };
+                        }
+                    }
+                    return s;
+                });
+                setStudentsData(updatedStudents);
+                showSaveMessage(`Fee status imported for ${updateCount} students!`);
+            } catch (err) {
+                showSaveMessage('Error reading file. Please check the format.');
+            }
+        };
+        reader.readAsBinaryString(file);
+        e.target.value = '';
+    };
+
     const getGradeColor = (percentage) => {
         if (percentage >= 90) return 'var(--color-success)';
         if (percentage >= 75) return 'var(--color-primary)';
@@ -291,6 +346,13 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage, studentsData, setStudents
                 type="file"
                 ref={marksFileRef}
                 onChange={importMarksExcel}
+                accept=".xlsx,.xls,.csv"
+                style={{ display: 'none' }}
+            />
+            <input
+                type="file"
+                ref={feeFileRef}
+                onChange={importFeeExcel}
                 accept=".xlsx,.xls,.csv"
                 style={{ display: 'none' }}
             />
@@ -773,13 +835,38 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage, studentsData, setStudents
                     {/* ========== FEE STATUS TAB ========== */}
                     {activeTab === 'fees' && (
                         <div className="animate-fade-in">
-                            <h2 style={{
-                                fontSize: '1.75rem',
-                                fontWeight: 'var(--font-weight-bold)',
-                                marginBottom: '1.5rem'
-                            }}>
-                                Fee Status
-                            </h2>
+                            <div className="flex-between" style={{ marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                                <h2 style={{
+                                    fontSize: '1.75rem',
+                                    fontWeight: 'var(--font-weight-bold)'
+                                }}>
+                                    Fee Status
+                                </h2>
+                                <div className="flex gap-2" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <button
+                                        onClick={exportFeeExcel}
+                                        style={{
+                                            ...excelBtnStyle,
+                                            background: '#217346',
+                                            color: 'white',
+                                            borderColor: '#217346'
+                                        }}
+                                    >
+                                        <Download size={16} /> Export Excel
+                                    </button>
+                                    <button
+                                        onClick={() => feeFileRef.current.click()}
+                                        style={{
+                                            ...excelBtnStyle,
+                                            background: 'white',
+                                            color: '#217346',
+                                            borderColor: '#217346'
+                                        }}
+                                    >
+                                        <Upload size={16} /> Import Excel
+                                    </button>
+                                </div>
+                            </div>
 
                             {/* Summary Cards */}
                             <div className="grid grid-cols-3" style={{ gap: '1.5rem', marginBottom: '2rem' }}>
