@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Users, Award, Calendar, DollarSign, LogOut,
     Save, CheckCircle, XCircle, Edit3, User,
-    Download, Upload
+    Download, Upload, FileText
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useSchoolData } from '../context/SchoolDataContext';
@@ -308,6 +308,172 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage }) => {
         return 'var(--color-danger)';
     };
 
+    // --- DOWNLOAD STUDENT REPORT ---
+    const downloadStudentReport = (studentId) => {
+        const student = students.find(s => s.id === studentId);
+        if (!student) return;
+
+        const avg = (student.results.reduce((sum, r) => sum + r.percentage, 0) / student.results.length).toFixed(1);
+        const overallGrade = percentageToGrade(parseFloat(avg));
+        const gradeColor = (pct) => pct >= 90 ? '#10b981' : pct >= 75 ? '#3b82f6' : pct >= 60 ? '#f59e0b' : '#ef4444';
+        const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+        const resultsRows = student.results.map(r => `
+            <tr>
+                <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;">${r.subject}</td>
+                <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;color:${gradeColor(r.percentage)};">${r.percentage}%</td>
+                <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;">${r.grade}</td>
+                <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:center;">
+                    <div style="background:#f1f5f9;border-radius:999px;height:10px;width:100%;overflow:hidden;">
+                        <div style="background:${gradeColor(r.percentage)};height:100%;width:${r.percentage}%;border-radius:999px;"></div>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+
+        let previousSection = '';
+        if (student.previousResults && student.previousResults.length > 0) {
+            const prevTerms = student.previousResults.map(term => {
+                const termAvg = (term.results.reduce((s, r) => s + r.percentage, 0) / term.results.length).toFixed(1);
+                const rows = term.results.map(r => `
+                    <tr>
+                        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;">${r.subject}</td>
+                        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;color:${gradeColor(r.percentage)};">${r.percentage}%</td>
+                        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;">${r.grade}</td>
+                    </tr>
+                `).join('');
+                return `
+                    <div style="margin-bottom:16px;">
+                        <h4 style="font-size:14px;color:#334155;margin-bottom:8px;">${term.term} — Average: <strong style="color:${gradeColor(parseFloat(termAvg))};">${termAvg}%</strong></h4>
+                        <table style="width:100%;border-collapse:collapse;">
+                            <thead><tr style="background:#f8fafc;">
+                                <th style="padding:8px 12px;text-align:left;font-size:12px;color:#64748b;">Subject</th>
+                                <th style="padding:8px 12px;text-align:center;font-size:12px;color:#64748b;">Percentage</th>
+                                <th style="padding:8px 12px;text-align:center;font-size:12px;color:#64748b;">Grade</th>
+                            </tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                `;
+            }).join('');
+            previousSection = `
+                <div style="margin-top:28px;page-break-inside:avoid;">
+                    <h3 style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e2e8f0;">📚 Previous Term Results</h3>
+                    ${prevTerms}
+                </div>
+            `;
+        }
+
+        const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Report Card — ${student.name}</title>
+            <style>
+                @media print {
+                    body { margin: 0; }
+                    .no-print { display: none !important; }
+                }
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; color: #1e293b; background: #fff; }
+            </style>
+        </head>
+        <body>
+            <div style="max-width:800px;margin:0 auto;padding:40px 30px;">
+
+                <!-- Print Button -->
+                <div class="no-print" style="text-align:right;margin-bottom:16px;">
+                    <button onclick="window.print()" style="padding:10px 24px;background:#2563eb;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">🖨️ Print / Save as PDF</button>
+                </div>
+
+                <!-- Header -->
+                <div style="text-align:center;margin-bottom:32px;padding:24px;background:linear-gradient(135deg,#1e3a5f 0%,#2d5a87 50%,#1a7a4f 100%);border-radius:12px;color:white;">
+                    <h1 style="font-size:24px;margin:0 0 4px 0;">${schoolData.name || 'ACS Higher Secondary School'}</h1>
+                    <p style="font-size:13px;opacity:0.9;margin:0 0 12px 0;">${schoolData.contact?.address || ''}</p>
+                    <h2 style="font-size:20px;margin:0;font-weight:700;">STUDENT REPORT CARD</h2>
+                </div>
+
+                <!-- Student Info -->
+                <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:28px;padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
+                    <div><span style="font-size:12px;color:#64748b;display:block;">Student Name</span><strong style="font-size:16px;">${student.name}</strong></div>
+                    <div><span style="font-size:12px;color:#64748b;display:block;">Student ID</span><strong style="font-size:16px;">${student.id}</strong></div>
+                    <div><span style="font-size:12px;color:#64748b;display:block;">Class</span><strong style="font-size:16px;">${student.grade}</strong></div>
+                    <div><span style="font-size:12px;color:#64748b;display:block;">Report Date</span><strong style="font-size:16px;">${today}</strong></div>
+                </div>
+
+                <!-- Current Results -->
+                <div style="margin-bottom:28px;">
+                    <h3 style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e2e8f0;">📝 Current Term Results</h3>
+                    <table style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#f1f5f9;">
+                                <th style="padding:10px 14px;text-align:left;font-size:13px;color:#64748b;font-weight:600;">Subject</th>
+                                <th style="padding:10px 14px;text-align:center;font-size:13px;color:#64748b;font-weight:600;">Percentage</th>
+                                <th style="padding:10px 14px;text-align:center;font-size:13px;color:#64748b;font-weight:600;">Grade</th>
+                                <th style="padding:10px 14px;text-align:center;font-size:13px;color:#64748b;font-weight:600;">Performance</th>
+                            </tr>
+                        </thead>
+                        <tbody>${resultsRows}</tbody>
+                        <tfoot>
+                            <tr style="background:#f0fdf4;font-weight:700;">
+                                <td style="padding:12px 14px;font-size:14px;">Overall Average</td>
+                                <td style="padding:12px 14px;text-align:center;color:${gradeColor(parseFloat(avg))};font-size:16px;">${avg}%</td>
+                                <td style="padding:12px 14px;text-align:center;font-size:16px;">${overallGrade}</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Attendance -->
+                <div style="margin-bottom:28px;page-break-inside:avoid;">
+                    <h3 style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e2e8f0;">📅 Attendance Record</h3>
+                    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                        <div style="flex:1;min-width:140px;padding:16px;background:#f0fdf4;border-radius:10px;text-align:center;">
+                            <div style="font-size:28px;font-weight:800;color:#10b981;">${student.attendance.present}</div>
+                            <div style="font-size:12px;color:#64748b;margin-top:4px;">Days Present</div>
+                        </div>
+                        <div style="flex:1;min-width:140px;padding:16px;background:#fef2f2;border-radius:10px;text-align:center;">
+                            <div style="font-size:28px;font-weight:800;color:#ef4444;">${student.attendance.absent}</div>
+                            <div style="font-size:12px;color:#64748b;margin-top:4px;">Days Absent</div>
+                        </div>
+                        <div style="flex:1;min-width:140px;padding:16px;background:#eff6ff;border-radius:10px;text-align:center;">
+                            <div style="font-size:28px;font-weight:800;color:#3b82f6;">${student.attendance.total}</div>
+                            <div style="font-size:12px;color:#64748b;margin-top:4px;">Total Days</div>
+                        </div>
+                        <div style="flex:1;min-width:140px;padding:16px;background:linear-gradient(135deg,#1e3a5f,#2d5a87);border-radius:10px;text-align:center;color:white;">
+                            <div style="font-size:28px;font-weight:800;">${student.attendance.percentage}%</div>
+                            <div style="font-size:12px;opacity:0.85;margin-top:4px;">Attendance Rate</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fee Status -->
+                <div style="margin-bottom:28px;page-break-inside:avoid;">
+                    <h3 style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e2e8f0;">💰 Fee Status</h3>
+                    <div style="padding:16px 20px;border-radius:10px;display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;background:${student.feeStatus === 'paid' ? '#f0fdf4' : '#fef2f2'};color:${student.feeStatus === 'paid' ? '#059669' : '#dc2626'};border:2px solid ${student.feeStatus === 'paid' ? '#bbf7d0' : '#fecaca'};">
+                        ${student.feeStatus === 'paid' ? '✅' : '❌'} Fees ${student.feeStatus === 'paid' ? 'Paid' : 'Unpaid'}
+                    </div>
+                </div>
+
+                ${previousSection}
+
+                <!-- Footer -->
+                <div style="margin-top:40px;padding-top:20px;border-top:2px solid #e2e8f0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;font-size:12px;color:#94a3b8;">
+                    <div>Generated on ${today}</div>
+                    <div>${schoolData.name || 'ACS Higher Secondary School'}</div>
+                    <div style="width:200px;border-top:1px solid #94a3b8;padding-top:6px;text-align:center;">Authorized Signature</div>
+                </div>
+            </div>
+        </body>
+        </html>
+        `;
+
+        const reportWindow = window.open('', '_blank');
+        reportWindow.document.write(html);
+        reportWindow.document.close();
+        showSaveMessage(`Report generated for ${student.name}!`);
+    };
+
     // Common button style for Excel buttons
     const excelBtnStyle = {
         padding: '0.5rem 1rem',
@@ -418,7 +584,8 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage }) => {
                         {[
                             { id: 'marks', label: 'Student Marks', icon: Award },
                             { id: 'attendance', label: 'Attendance Sheet', icon: Calendar },
-                            { id: 'fees', label: 'Fee Status', icon: DollarSign }
+                            { id: 'fees', label: 'Fee Status', icon: DollarSign },
+                            { id: 'reports', label: 'Student Reports', icon: FileText }
                         ].map((tab) => (
                             <button
                                 key={tab.id}
@@ -503,9 +670,14 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage }) => {
                                     ))}
                                 </select>
                                 {selectedStudent && !editingMarks && (
-                                    <button onClick={startEditingMarks} className="btn btn-primary btn-sm">
-                                        <Edit3 size={16} /> Edit Marks
-                                    </button>
+                                    <>
+                                        <button onClick={startEditingMarks} className="btn btn-primary btn-sm">
+                                            <Edit3 size={16} /> Edit Marks
+                                        </button>
+                                        <button onClick={() => downloadStudentReport(selectedStudent)} className="btn btn-sm" style={{ background: '#7c3aed', color: 'white' }}>
+                                            <FileText size={16} /> Download Report
+                                        </button>
+                                    </>
                                 )}
                                 {editingMarks && (
                                     <button onClick={saveMarks} className="btn btn-primary btn-sm">
@@ -975,6 +1147,125 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage }) => {
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ========== REPORTS TAB ========== */}
+                    {activeTab === 'reports' && (
+                        <div className="animate-fade-in">
+                            <div className="flex-between" style={{ marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                                <h2 style={{
+                                    fontSize: '1.75rem',
+                                    fontWeight: 'var(--font-weight-bold)'
+                                }}>
+                                    Student Reports
+                                </h2>
+                                <p style={{ color: 'var(--color-gray-600)', fontSize: '0.95rem' }}>
+                                    Generate and download comprehensive report cards for each student
+                                </p>
+                            </div>
+
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                                gap: '1.25rem'
+                            }}>
+                                {students.map((student) => {
+                                    const sAvg = (student.results.reduce((sum, r) => sum + r.percentage, 0) / student.results.length).toFixed(1);
+                                    return (
+                                        <div key={student.id} className="card" style={{
+                                            padding: '1.5rem',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '1rem'
+                                        }}>
+                                            <div className="flex gap-2" style={{ alignItems: 'center' }}>
+                                                <div className="flex-center" style={{
+                                                    width: '48px',
+                                                    height: '48px',
+                                                    background: 'var(--gradient-primary)',
+                                                    borderRadius: '50%',
+                                                    color: 'white',
+                                                    fontWeight: 'var(--font-weight-bold)',
+                                                    fontSize: '1.1rem',
+                                                    flexShrink: 0
+                                                }}>
+                                                    {student.name.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <div style={{
+                                                        fontWeight: 'var(--font-weight-bold)',
+                                                        fontSize: '1.1rem',
+                                                        color: 'var(--color-gray-900)'
+                                                    }}>
+                                                        {student.name}
+                                                    </div>
+                                                    <div style={{
+                                                        fontSize: '0.85rem',
+                                                        color: 'var(--color-gray-600)'
+                                                    }}>
+                                                        {student.id} • {student.grade}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div style={{
+                                                display: 'flex',
+                                                gap: '0.75rem',
+                                                flexWrap: 'wrap'
+                                            }}>
+                                                <span className="badge" style={{
+                                                    background: parseFloat(sAvg) >= 85 ? '#ecfdf5' : parseFloat(sAvg) >= 70 ? '#eff6ff' : '#fef2f2',
+                                                    color: parseFloat(sAvg) >= 85 ? '#059669' : parseFloat(sAvg) >= 70 ? '#2563eb' : '#dc2626',
+                                                    padding: '0.3rem 0.8rem',
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: 'var(--font-weight-bold)'
+                                                }}>
+                                                    Avg: {sAvg}%
+                                                </span>
+                                                <span className="badge" style={{
+                                                    background: student.attendance.percentage >= 90 ? '#ecfdf5' : '#fef2f2',
+                                                    color: student.attendance.percentage >= 90 ? '#059669' : '#dc2626',
+                                                    padding: '0.3rem 0.8rem',
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: 'var(--font-weight-bold)'
+                                                }}>
+                                                    Attendance: {student.attendance.percentage}%
+                                                </span>
+                                                <span className="badge" style={{
+                                                    background: student.feeStatus === 'paid' ? '#ecfdf5' : '#fef2f2',
+                                                    color: student.feeStatus === 'paid' ? '#059669' : '#dc2626',
+                                                    padding: '0.3rem 0.8rem',
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: 'var(--font-weight-bold)'
+                                                }}>
+                                                    Fee: {student.feeStatus === 'paid' ? 'Paid' : 'Unpaid'}
+                                                </span>
+                                            </div>
+
+                                            <button
+                                                onClick={() => downloadStudentReport(student.id)}
+                                                className="btn"
+                                                style={{
+                                                    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                                                    color: 'white',
+                                                    width: '100%',
+                                                    padding: '0.75rem',
+                                                    fontWeight: 'var(--font-weight-bold)',
+                                                    fontSize: '0.9rem',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '0.5rem'
+                                                }}
+                                            >
+                                                <FileText size={16} />
+                                                Download Report Card
+                                            </button>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
