@@ -315,17 +315,29 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage }) => {
 
         const avg = (student.results.reduce((sum, r) => sum + r.percentage, 0) / student.results.length).toFixed(1);
         const overallGrade = percentageToGrade(parseFloat(avg));
-        const gradeColor = (pct) => pct >= 90 ? '#10b981' : pct >= 75 ? '#3b82f6' : pct >= 60 ? '#f59e0b' : '#ef4444';
+        const gradeColor = (pct) => pct >= 90 ? '#0d7c52' : pct >= 75 ? '#1a5fb4' : pct >= 60 ? '#c4841d' : '#c0392b';
+        const gradeBg = (pct) => pct >= 90 ? '#e6f9f0' : pct >= 75 ? '#e8f0fc' : pct >= 60 ? '#fef5e7' : '#fce8e6';
         const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const schoolName = schoolData.name || 'ACS Higher Secondary School';
+        const schoolAddress = schoolData.contact?.address || '';
+        const schoolPhone = schoolData.contact?.phone || '';
+        const schoolEmail = schoolData.contact?.email || '';
 
-        const resultsRows = student.results.map(r => `
-            <tr>
-                <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;">${r.subject}</td>
-                <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;color:${gradeColor(r.percentage)};">${r.percentage}%</td>
-                <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;">${r.grade}</td>
-                <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:center;">
-                    <div style="background:#f1f5f9;border-radius:999px;height:10px;width:100%;overflow:hidden;">
-                        <div style="background:${gradeColor(r.percentage)};height:100%;width:${r.percentage}%;border-radius:999px;"></div>
+        const resultsRows = student.results.map((r, i) => `
+            <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+                <td style="padding:12px 16px;border-bottom:1px solid #edf2f7;font-size:13px;font-weight:500;color:#2d3748;">${r.subject}</td>
+                <td style="padding:12px 16px;border-bottom:1px solid #edf2f7;text-align:center;">
+                    <span style="display:inline-block;padding:4px 14px;border-radius:20px;font-weight:700;font-size:13px;background:${gradeBg(r.percentage)};color:${gradeColor(r.percentage)};">${r.percentage}%</span>
+                </td>
+                <td style="padding:12px 16px;border-bottom:1px solid #edf2f7;text-align:center;">
+                    <span style="display:inline-block;width:36px;height:36px;line-height:36px;border-radius:50%;font-weight:800;font-size:14px;background:${gradeBg(r.percentage)};color:${gradeColor(r.percentage)};text-align:center;">${r.grade}</span>
+                </td>
+                <td style="padding:12px 16px;border-bottom:1px solid #edf2f7;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <div style="flex:1;background:#edf2f7;border-radius:20px;height:8px;overflow:hidden;">
+                            <div style="background:linear-gradient(90deg,${gradeColor(r.percentage)},${gradeColor(r.percentage)}cc);height:100%;width:${r.percentage}%;border-radius:20px;transition:width 0.5s;"></div>
+                        </div>
+                        <span style="font-size:11px;color:#a0aec0;font-weight:600;min-width:28px;">${r.percentage}</span>
                     </div>
                 </td>
             </tr>
@@ -335,21 +347,24 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage }) => {
         if (student.previousResults && student.previousResults.length > 0) {
             const prevTerms = student.previousResults.map(term => {
                 const termAvg = (term.results.reduce((s, r) => s + r.percentage, 0) / term.results.length).toFixed(1);
-                const rows = term.results.map(r => `
-                    <tr>
-                        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;">${r.subject}</td>
-                        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;color:${gradeColor(r.percentage)};">${r.percentage}%</td>
-                        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;">${r.grade}</td>
+                const rows = term.results.map((r, i) => `
+                    <tr style="background:${i % 2 === 0 ? '#fff' : '#fafbfc'};">
+                        <td style="padding:8px 14px;border-bottom:1px solid #edf2f7;font-size:12px;color:#4a5568;">${r.subject}</td>
+                        <td style="padding:8px 14px;border-bottom:1px solid #edf2f7;text-align:center;font-weight:700;font-size:12px;color:${gradeColor(r.percentage)};">${r.percentage}%</td>
+                        <td style="padding:8px 14px;border-bottom:1px solid #edf2f7;text-align:center;font-weight:700;font-size:12px;color:${gradeColor(r.percentage)};">${r.grade}</td>
                     </tr>
                 `).join('');
                 return `
-                    <div style="margin-bottom:16px;">
-                        <h4 style="font-size:14px;color:#334155;margin-bottom:8px;">${term.term} — Average: <strong style="color:${gradeColor(parseFloat(termAvg))};">${termAvg}%</strong></h4>
+                    <div style="margin-bottom:20px;background:#fafbfc;border-radius:10px;padding:16px;border:1px solid #edf2f7;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                            <span style="font-family:'Playfair Display',Georgia,serif;font-size:14px;font-weight:700;color:#1a3a6b;">${term.term}</span>
+                            <span style="font-size:12px;font-weight:700;color:${gradeColor(parseFloat(termAvg))};background:${gradeBg(parseFloat(termAvg))};padding:3px 12px;border-radius:20px;">Avg: ${termAvg}%</span>
+                        </div>
                         <table style="width:100%;border-collapse:collapse;">
-                            <thead><tr style="background:#f8fafc;">
-                                <th style="padding:8px 12px;text-align:left;font-size:12px;color:#64748b;">Subject</th>
-                                <th style="padding:8px 12px;text-align:center;font-size:12px;color:#64748b;">Percentage</th>
-                                <th style="padding:8px 12px;text-align:center;font-size:12px;color:#64748b;">Grade</th>
+                            <thead><tr>
+                                <th style="padding:7px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#a0aec0;border-bottom:2px solid #edf2f7;">Subject</th>
+                                <th style="padding:7px 14px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#a0aec0;border-bottom:2px solid #edf2f7;">Score</th>
+                                <th style="padding:7px 14px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#a0aec0;border-bottom:2px solid #edf2f7;">Grade</th>
                             </tr></thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -357,8 +372,11 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage }) => {
                 `;
             }).join('');
             previousSection = `
-                <div style="margin-top:28px;page-break-inside:avoid;">
-                    <h3 style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e2e8f0;">📚 Previous Term Results</h3>
+                <div style="margin-top:32px;page-break-inside:avoid;">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+                        <div style="width:4px;height:24px;background:#1a3a6b;border-radius:2px;"></div>
+                        <h3 style="font-family:'Playfair Display',Georgia,serif;font-size:17px;font-weight:700;color:#1a3a6b;margin:0;">Previous Academic Records</h3>
+                    </div>
                     ${prevTerms}
                 </div>
             `;
@@ -368,101 +386,190 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage }) => {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Report Card — ${student.name}</title>
+            <title>Report Card \u2014 ${student.name}</title>
+            <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
             <style>
+                * { box-sizing: border-box; margin: 0; padding: 0; }
                 @media print {
-                    body { margin: 0; }
+                    body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                     .no-print { display: none !important; }
+                    .page { box-shadow: none !important; }
                 }
-                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; color: #1e293b; background: #fff; }
+                body {
+                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                    color: #2d3748;
+                    background: #f1f5f9;
+                }
+                .page {
+                    max-width: 820px;
+                    margin: 24px auto;
+                    background: #ffffff;
+                    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+                    border-radius: 8px;
+                    overflow: hidden;
+                }
             </style>
         </head>
         <body>
-            <div style="max-width:800px;margin:0 auto;padding:40px 30px;">
+            <!-- Print Button -->
+            <div class="no-print" style="text-align:center;padding:20px;">
+                <button onclick="window.print()" style="padding:12px 32px;background:linear-gradient(135deg,#1a3a6b,#2563eb);color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;letter-spacing:0.3px;box-shadow:0 4px 14px rgba(37,99,235,0.3);">
+                    \ud83d\udda8\ufe0f Print / Save as PDF
+                </button>
+            </div>
 
-                <!-- Print Button -->
-                <div class="no-print" style="text-align:right;margin-bottom:16px;">
-                    <button onclick="window.print()" style="padding:10px 24px;background:#2563eb;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">🖨️ Print / Save as PDF</button>
-                </div>
+            <div class="page">
+                <!-- Top Blue Accent Bar -->
+                <div style="height:6px;background:linear-gradient(90deg,#0f2b52,#1a3a6b,#2563eb,#1a3a6b,#0f2b52);"></div>
 
-                <!-- Header -->
-                <div style="text-align:center;margin-bottom:32px;padding:24px;background:linear-gradient(135deg,#1e3a5f 0%,#2d5a87 50%,#1a7a4f 100%);border-radius:12px;color:white;">
-                    <h1 style="font-size:24px;margin:0 0 4px 0;">${schoolData.name || 'ACS Higher Secondary School'}</h1>
-                    <p style="font-size:13px;opacity:0.9;margin:0 0 12px 0;">${schoolData.contact?.address || ''}</p>
-                    <h2 style="font-size:20px;margin:0;font-weight:700;">STUDENT REPORT CARD</h2>
+                <!-- School Header -->
+                <div style="text-align:center;padding:36px 40px 28px;border-bottom:3px double #1a3a6b;">
+                    <h1 style="font-family:'Playfair Display',Georgia,serif;font-size:30px;font-weight:800;color:#1a3a6b;letter-spacing:1px;margin-bottom:6px;">
+                        ${schoolName}
+                    </h1>
+                    <p style="font-size:12px;color:#64748b;letter-spacing:0.8px;margin-bottom:4px;">${schoolAddress}</p>
+                    ${schoolPhone || schoolEmail ? `<p style="font-size:11px;color:#94a3b8;letter-spacing:0.5px;">${schoolPhone}${schoolPhone && schoolEmail ? ' \u2022 ' : ''}${schoolEmail}</p>` : ''}
+                    
+                    <!-- Decorative divider -->
+                    <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:18px 0 0;">
+                        <div style="flex:1;max-width:120px;height:1px;background:linear-gradient(90deg,transparent,#1a3a6b);"></div>
+                        <div style="padding:8px 28px;border:2px solid #1a3a6b;border-radius:4px;">
+                            <span style="font-family:'Playfair Display',Georgia,serif;font-size:15px;font-weight:700;color:#1a3a6b;letter-spacing:2px;">REPORT CARD</span>
+                        </div>
+                        <div style="flex:1;max-width:120px;height:1px;background:linear-gradient(90deg,#1a3a6b,transparent);"></div>
+                    </div>
                 </div>
 
                 <!-- Student Info -->
-                <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:28px;padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
-                    <div><span style="font-size:12px;color:#64748b;display:block;">Student Name</span><strong style="font-size:16px;">${student.name}</strong></div>
-                    <div><span style="font-size:12px;color:#64748b;display:block;">Student ID</span><strong style="font-size:16px;">${student.id}</strong></div>
-                    <div><span style="font-size:12px;color:#64748b;display:block;">Class</span><strong style="font-size:16px;">${student.grade}</strong></div>
-                    <div><span style="font-size:12px;color:#64748b;display:block;">Report Date</span><strong style="font-size:16px;">${today}</strong></div>
-                </div>
-
-                <!-- Current Results -->
-                <div style="margin-bottom:28px;">
-                    <h3 style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e2e8f0;">📝 Current Term Results</h3>
-                    <table style="width:100%;border-collapse:collapse;">
-                        <thead>
-                            <tr style="background:#f1f5f9;">
-                                <th style="padding:10px 14px;text-align:left;font-size:13px;color:#64748b;font-weight:600;">Subject</th>
-                                <th style="padding:10px 14px;text-align:center;font-size:13px;color:#64748b;font-weight:600;">Percentage</th>
-                                <th style="padding:10px 14px;text-align:center;font-size:13px;color:#64748b;font-weight:600;">Grade</th>
-                                <th style="padding:10px 14px;text-align:center;font-size:13px;color:#64748b;font-weight:600;">Performance</th>
-                            </tr>
-                        </thead>
-                        <tbody>${resultsRows}</tbody>
-                        <tfoot>
-                            <tr style="background:#f0fdf4;font-weight:700;">
-                                <td style="padding:12px 14px;font-size:14px;">Overall Average</td>
-                                <td style="padding:12px 14px;text-align:center;color:${gradeColor(parseFloat(avg))};font-size:16px;">${avg}%</td>
-                                <td style="padding:12px 14px;text-align:center;font-size:16px;">${overallGrade}</td>
-                                <td></td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-
-                <!-- Attendance -->
-                <div style="margin-bottom:28px;page-break-inside:avoid;">
-                    <h3 style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e2e8f0;">📅 Attendance Record</h3>
-                    <div style="display:flex;gap:16px;flex-wrap:wrap;">
-                        <div style="flex:1;min-width:140px;padding:16px;background:#f0fdf4;border-radius:10px;text-align:center;">
-                            <div style="font-size:28px;font-weight:800;color:#10b981;">${student.attendance.present}</div>
-                            <div style="font-size:12px;color:#64748b;margin-top:4px;">Days Present</div>
+                <div style="padding:24px 40px;">
+                    <div style="display:flex;flex-wrap:wrap;gap:0;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+                        <div style="flex:1;min-width:180px;padding:16px 20px;background:#f8fafc;border-right:1px solid #e2e8f0;">
+                            <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;font-weight:700;margin-bottom:4px;">Student Name</div>
+                            <div style="font-size:16px;font-weight:700;color:#1a3a6b;">${student.name}</div>
                         </div>
-                        <div style="flex:1;min-width:140px;padding:16px;background:#fef2f2;border-radius:10px;text-align:center;">
-                            <div style="font-size:28px;font-weight:800;color:#ef4444;">${student.attendance.absent}</div>
-                            <div style="font-size:12px;color:#64748b;margin-top:4px;">Days Absent</div>
+                        <div style="flex:1;min-width:120px;padding:16px 20px;background:#f8fafc;border-right:1px solid #e2e8f0;">
+                            <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;font-weight:700;margin-bottom:4px;">Student ID</div>
+                            <div style="font-size:16px;font-weight:700;color:#2d3748;">${student.id}</div>
                         </div>
-                        <div style="flex:1;min-width:140px;padding:16px;background:#eff6ff;border-radius:10px;text-align:center;">
-                            <div style="font-size:28px;font-weight:800;color:#3b82f6;">${student.attendance.total}</div>
-                            <div style="font-size:12px;color:#64748b;margin-top:4px;">Total Days</div>
+                        <div style="flex:1;min-width:100px;padding:16px 20px;background:#f8fafc;border-right:1px solid #e2e8f0;">
+                            <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;font-weight:700;margin-bottom:4px;">Class</div>
+                            <div style="font-size:16px;font-weight:700;color:#2d3748;">${student.grade}</div>
                         </div>
-                        <div style="flex:1;min-width:140px;padding:16px;background:linear-gradient(135deg,#1e3a5f,#2d5a87);border-radius:10px;text-align:center;color:white;">
-                            <div style="font-size:28px;font-weight:800;">${student.attendance.percentage}%</div>
-                            <div style="font-size:12px;opacity:0.85;margin-top:4px;">Attendance Rate</div>
+                        <div style="flex:1;min-width:140px;padding:16px 20px;background:#f8fafc;">
+                            <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;font-weight:700;margin-bottom:4px;">Report Date</div>
+                            <div style="font-size:16px;font-weight:700;color:#2d3748;">${today}</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Fee Status -->
-                <div style="margin-bottom:28px;page-break-inside:avoid;">
-                    <h3 style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e2e8f0;">💰 Fee Status</h3>
-                    <div style="padding:16px 20px;border-radius:10px;display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;background:${student.feeStatus === 'paid' ? '#f0fdf4' : '#fef2f2'};color:${student.feeStatus === 'paid' ? '#059669' : '#dc2626'};border:2px solid ${student.feeStatus === 'paid' ? '#bbf7d0' : '#fecaca'};">
-                        ${student.feeStatus === 'paid' ? '✅' : '❌'} Fees ${student.feeStatus === 'paid' ? 'Paid' : 'Unpaid'}
+                <!-- Main Content -->
+                <div style="padding:0 40px 32px;">
+
+                    <!-- Current Term Results -->
+                    <div style="margin-bottom:32px;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                            <div style="width:4px;height:24px;background:#1a3a6b;border-radius:2px;"></div>
+                            <h3 style="font-family:'Playfair Display',Georgia,serif;font-size:17px;font-weight:700;color:#1a3a6b;margin:0;">Current Term Results</h3>
+                        </div>
+                        <table style="width:100%;border-collapse:collapse;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+                            <thead>
+                                <tr style="background:linear-gradient(135deg,#1a3a6b,#1e4d8a);">
+                                    <th style="padding:12px 16px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#ffffff;font-weight:700;">Subject</th>
+                                    <th style="padding:12px 16px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#ffffff;font-weight:700;">Score</th>
+                                    <th style="padding:12px 16px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#ffffff;font-weight:700;">Grade</th>
+                                    <th style="padding:12px 16px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#ffffff;font-weight:700;">Performance</th>
+                                </tr>
+                            </thead>
+                            <tbody>${resultsRows}</tbody>
+                            <tfoot>
+                                <tr style="background:linear-gradient(135deg,#f0f7ff,#e8f0fc);border-top:2px solid #1a3a6b;">
+                                    <td style="padding:14px 16px;font-size:14px;font-weight:800;color:#1a3a6b;">Overall Average</td>
+                                    <td style="padding:14px 16px;text-align:center;">
+                                        <span style="font-size:18px;font-weight:800;color:#1a3a6b;">${avg}%</span>
+                                    </td>
+                                    <td style="padding:14px 16px;text-align:center;">
+                                        <span style="display:inline-block;width:42px;height:42px;line-height:42px;border-radius:50%;font-weight:800;font-size:16px;background:#1a3a6b;color:white;text-align:center;">${overallGrade}</span>
+                                    </td>
+                                    <td style="padding:14px 16px;text-align:center;">
+                                        <span style="font-size:12px;font-weight:700;color:${gradeColor(parseFloat(avg))};">${parseFloat(avg) >= 85 ? 'Excellent' : parseFloat(avg) >= 70 ? 'Good' : parseFloat(avg) >= 50 ? 'Satisfactory' : 'Needs Improvement'}</span>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- Attendance & Fee Status side by side -->
+                    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:32px;">
+                        <!-- Attendance -->
+                        <div style="flex:2;min-width:300px;page-break-inside:avoid;">
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                                <div style="width:4px;height:24px;background:#1a3a6b;border-radius:2px;"></div>
+                                <h3 style="font-family:'Playfair Display',Georgia,serif;font-size:17px;font-weight:700;color:#1a3a6b;margin:0;">Attendance Record</h3>
+                            </div>
+                            <div style="border:1px solid #edf2f7;border-radius:12px;overflow:hidden;">
+                                <div style="display:flex;text-align:center;">
+                                    <div style="flex:1;padding:18px 10px;background:#f0fdf4;border-right:1px solid #edf2f7;">
+                                        <div style="font-size:26px;font-weight:800;color:#0d7c52;">${student.attendance.present}</div>
+                                        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;font-weight:600;margin-top:3px;">Present</div>
+                                    </div>
+                                    <div style="flex:1;padding:18px 10px;background:#fef2f2;border-right:1px solid #edf2f7;">
+                                        <div style="font-size:26px;font-weight:800;color:#c0392b;">${student.attendance.absent}</div>
+                                        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;font-weight:600;margin-top:3px;">Absent</div>
+                                    </div>
+                                    <div style="flex:1;padding:18px 10px;background:#eff6ff;border-right:1px solid #edf2f7;">
+                                        <div style="font-size:26px;font-weight:800;color:#1a5fb4;">${student.attendance.total}</div>
+                                        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;font-weight:600;margin-top:3px;">Total</div>
+                                    </div>
+                                    <div style="flex:1;padding:18px 10px;background:linear-gradient(135deg,#0f2b52,#1a3a6b);color:white;">
+                                        <div style="font-size:26px;font-weight:800;">${student.attendance.percentage}%</div>
+                                        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;opacity:0.8;font-weight:600;margin-top:3px;">Rate</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Fee Status -->
+                        <div style="flex:1;min-width:180px;page-break-inside:avoid;">
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                                <div style="width:4px;height:24px;background:#1a3a6b;border-radius:2px;"></div>
+                                <h3 style="font-family:'Playfair Display',Georgia,serif;font-size:17px;font-weight:700;color:#1a3a6b;margin:0;">Fee Status</h3>
+                            </div>
+                            <div style="border:1px solid #edf2f7;border-radius:12px;overflow:hidden;text-align:center;padding:24px 16px;background:${student.feeStatus === 'paid' ? 'linear-gradient(135deg,#f0fdf4,#e6f9f0)' : 'linear-gradient(135deg,#fef2f2,#fce8e6)'};">
+                                <div style="font-size:40px;margin-bottom:8px;">${student.feeStatus === 'paid' ? '\u2705' : '\u274c'}</div>
+                                <div style="font-size:18px;font-weight:800;color:${student.feeStatus === 'paid' ? '#0d7c52' : '#c0392b'};text-transform:uppercase;letter-spacing:1px;">${student.feeStatus === 'paid' ? 'Paid' : 'Unpaid'}</div>
+                                <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Tuition Fees</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${previousSection}
+
+                    <!-- Signature Section -->
+                    <div style="margin-top:48px;padding-top:24px;border-top:1px solid #edf2f7;display:flex;justify-content:space-between;flex-wrap:wrap;gap:24px;">
+                        <div style="text-align:center;">
+                            <div style="width:180px;border-bottom:2px solid #1a3a6b;margin-bottom:8px;height:40px;"></div>
+                            <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Class Teacher</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="width:180px;border-bottom:2px solid #1a3a6b;margin-bottom:8px;height:40px;"></div>
+                            <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Principal</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="width:180px;border-bottom:2px solid #1a3a6b;margin-bottom:8px;height:40px;"></div>
+                            <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Parent / Guardian</div>
+                        </div>
                     </div>
                 </div>
-
-                ${previousSection}
 
                 <!-- Footer -->
-                <div style="margin-top:40px;padding-top:20px;border-top:2px solid #e2e8f0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;font-size:12px;color:#94a3b8;">
-                    <div>Generated on ${today}</div>
-                    <div>${schoolData.name || 'ACS Higher Secondary School'}</div>
-                    <div style="width:200px;border-top:1px solid #94a3b8;padding-top:6px;text-align:center;">Authorized Signature</div>
+                <div style="background:#f8fafc;border-top:1px solid #edf2f7;padding:16px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                    <div style="font-size:10px;color:#94a3b8;font-weight:500;">Generated on ${today}</div>
+                    <div style="font-size:10px;color:#1a3a6b;font-weight:700;letter-spacing:0.5px;">${schoolName}</div>
+                    <div style="font-size:10px;color:#94a3b8;font-style:italic;">This is a computer-generated document</div>
                 </div>
+
+                <!-- Bottom Blue Accent Bar -->
+                <div style="height:6px;background:linear-gradient(90deg,#0f2b52,#1a3a6b,#2563eb,#1a3a6b,#0f2b52);"></div>
             </div>
         </body>
         </html>
