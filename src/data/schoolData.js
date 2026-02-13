@@ -160,13 +160,14 @@ export const schoolData = {
         {
             id: "STU001",
             password: "demo123",
-            name: "John Smith",
+            name: "Muhammad Amir",
             grade: "Grade 11",
+            feeStatus: "paid",
             results: [
                 { subject: "Mathematics", grade: "A", percentage: 92 },
                 { subject: "Physics", grade: "A-", percentage: 88 },
-                { subject: "English Literature", grade: "B+", percentage: 85 },
-                { subject: "History", grade: "A", percentage: 90 },
+                { subject: "English", grade: "B+", percentage: 85 },
+                { subject: "Urdu", grade: "A", percentage: 90 },
                 { subject: "Chemistry", grade: "A-", percentage: 87 }
             ],
             attendance: {
@@ -176,11 +177,92 @@ export const schoolData = {
                 percentage: 98.3
             },
             schedule: [
-                { day: "Sunday", periods: ["Math", "Physics", "English", "History", "Break", "Chemistry"] },
-                { day: "Monday", periods: ["English", "Math", "PE", "Chemistry", "Break", "Physics"] },
-                { day: "Tuesday", periods: ["History", "Chemistry", "Math", "English", "Break", "Art"] },
-                { day: "Wednesday", periods: ["Physics", "English", "History", "Math", "Break", "Music"] },
-                { day: "Thursday", periods: ["Chemistry", "Math", "Physics", "English", "Break", "Study Hall"] }
+                { day: "Monday", periods: ["Math", "Physics", "English", "Urdu", "Break", "Chemistry"] },
+                { day: "Tuesday", periods: ["English", "Math", "PE", "Chemistry", "Break", "Physics"] },
+                { day: "Wednesday", periods: ["Urdu", "Chemistry", "Math", "English", "Break", "Art"] },
+                { day: "Thursday", periods: ["Physics", "English", "Urdu", "Math", "Break", "Music"] },
+                { day: "Friday", periods: ["Chemistry", "Math", "Physics", "English", "Break", "Study Hall"] }
+            ]
+        },
+        {
+            id: "STU002",
+            password: "demo123",
+            name: "Muhammad Ali",
+            grade: "Grade 10",
+            feeStatus: "unpaid",
+            results: [
+                { subject: "Mathematics", grade: "B+", percentage: 85 },
+                { subject: "Physics", grade: "B", percentage: 78 },
+                { subject: "English", grade: "A-", percentage: 89 },
+                { subject: "Urdu", grade: "A", percentage: 91 },
+                { subject: "Chemistry", grade: "B+", percentage: 84 }
+            ],
+            attendance: {
+                present: 160,
+                absent: 15,
+                total: 175,
+                percentage: 91.4
+            },
+            schedule: [
+                { day: "Monday", periods: ["English", "Math", "Physics", "Chemistry", "Break", "Urdu"] },
+                { day: "Tuesday", periods: ["Math", "Chemistry", "Urdu", "English", "Break", "Physics"] },
+                { day: "Wednesday", periods: ["Physics", "Urdu", "English", "Math", "Break", "PE"] },
+                { day: "Thursday", periods: ["Chemistry", "English", "Math", "Physics", "Break", "Art"] },
+                { day: "Friday", periods: ["Urdu", "Math", "Chemistry", "English", "Break", "Study Hall"] }
+            ]
+        },
+        {
+            id: "STU003",
+            password: "demo123",
+            name: "Hafiz Muhammad Usman",
+            grade: "Grade 11",
+            feeStatus: "paid",
+            results: [
+                { subject: "Mathematics", grade: "A", percentage: 95 },
+                { subject: "Physics", grade: "A", percentage: 93 },
+                { subject: "English", grade: "A-", percentage: 88 },
+                { subject: "Urdu", grade: "B+", percentage: 86 },
+                { subject: "Chemistry", grade: "A", percentage: 94 }
+            ],
+            attendance: {
+                present: 170,
+                absent: 5,
+                total: 175,
+                percentage: 97.1
+            },
+            schedule: [
+                { day: "Monday", periods: ["Math", "Physics", "English", "Urdu", "Break", "Chemistry"] },
+                { day: "Tuesday", periods: ["English", "Math", "PE", "Chemistry", "Break", "Physics"] },
+                { day: "Wednesday", periods: ["Urdu", "Chemistry", "Math", "English", "Break", "Art"] },
+                { day: "Thursday", periods: ["Physics", "English", "Urdu", "Math", "Break", "Music"] },
+                { day: "Friday", periods: ["Chemistry", "Math", "Physics", "English", "Break", "Study Hall"] }
+            ]
+        },
+        {
+            id: "STU004",
+            password: "demo123",
+            name: "Ahmed Hassan",
+            grade: "Grade 9",
+            feeStatus: "unpaid",
+            results: [
+                { subject: "Mathematics", grade: "B", percentage: 76 },
+                { subject: "Physics", grade: "B-", percentage: 72 },
+                { subject: "English", grade: "B+", percentage: 83 },
+                { subject: "Urdu", grade: "A-", percentage: 88 },
+                { subject: "Chemistry", grade: "B", percentage: 75 }
+            ],
+            attendance: {
+                present: 155,
+                absent: 20,
+                total: 175,
+                percentage: 88.6
+            },
+            schedule: [
+                { day: "Monday", periods: ["English", "Physics", "Math", "Urdu", "Break", "Chemistry"] },
+                { day: "Tuesday", periods: ["Math", "English", "Chemistry", "Physics", "Break", "PE"] },
+                { day: "Wednesday", periods: ["Urdu", "Math", "English", "Chemistry", "Break", "Art"] },
+                { day: "Thursday", periods: ["Physics", "Urdu", "Math", "English", "Break", "Music"] },
+                { day: "Friday", periods: ["Chemistry", "English", "Physics", "Math", "Break", "Study Hall"] }
             ]
         }
     ]
@@ -190,4 +272,10 @@ export const schoolData = {
 export const adminCredentials = {
     username: "admin",
     password: "admin123"
+};
+
+// Teacher credentials
+export const teacherCredentials = {
+    username: "teacher",
+    password: "teacher123"
 };

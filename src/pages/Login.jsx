@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { LogIn, User, Lock, AlertCircle } from 'lucide-react';
-import { schoolData, adminCredentials } from '../data/schoolData';
+import { schoolData, adminCredentials, teacherCredentials } from '../data/schoolData';
 
-const Login = ({ setIsLoggedIn, setIsAdmin, setCurrentPage, setLoggedInStudent }) => {
-    const [loginType, setLoginType] = useState('student'); // 'student' or 'admin'
+const Login = ({ setIsLoggedIn, setIsAdmin, setIsTeacher, setCurrentPage, setLoggedInStudent }) => {
+    const [loginType, setLoginType] = useState('student'); // 'student', 'teacher', or 'admin'
     const [credentials, setCredentials] = useState({
         username: '',
         password: ''
@@ -15,7 +15,6 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setCurrentPage, setLoggedInStudent }
         setError('');
 
         if (loginType === 'admin') {
-            // Admin login
             if (credentials.username === adminCredentials.username &&
                 credentials.password === adminCredentials.password) {
                 setIsAdmin(true);
@@ -23,8 +22,15 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setCurrentPage, setLoggedInStudent }
             } else {
                 setError('Invalid admin credentials');
             }
+        } else if (loginType === 'teacher') {
+            if (credentials.username === teacherCredentials.username &&
+                credentials.password === teacherCredentials.password) {
+                setIsTeacher(true);
+                setCurrentPage('teacher');
+            } else {
+                setError('Invalid teacher credentials');
+            }
         } else {
-            // Student login
             const student = schoolData.students.find(
                 s => s.id === credentials.username && s.password === credentials.password
             );
@@ -46,6 +52,12 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setCurrentPage, setLoggedInStudent }
         });
         setError('');
     };
+
+    const loginTypes = [
+        { id: 'student', label: 'Student' },
+        { id: 'teacher', label: 'Teacher' },
+        { id: 'admin', label: 'Admin' }
+    ];
 
     return (
         <div style={{
@@ -91,57 +103,41 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setCurrentPage, setLoggedInStudent }
                     color: 'var(--color-gray-600)',
                     marginBottom: '2rem'
                 }}>
-                    Access your student portal or admin dashboard
+                    Access your student, teacher, or admin portal
                 </p>
 
-                {/* Login Type Toggle */}
+                {/* Login Type Toggle - 3 way */}
                 <div className="flex gap-2" style={{ marginBottom: '2rem' }}>
-                    <button
-                        onClick={() => {
-                            setLoginType('student');
-                            setError('');
-                            setCredentials({ username: '', password: '' });
-                        }}
-                        style={{
-                            flex: 1,
-                            padding: '0.75rem',
-                            borderRadius: 'var(--radius-lg)',
-                            fontWeight: 'var(--font-weight-semibold)',
-                            border: '2px solid',
-                            borderColor: loginType === 'student' ? 'var(--color-primary)' : 'var(--color-gray-300)',
-                            background: loginType === 'student' ? 'var(--color-primary)' : 'white',
-                            color: loginType === 'student' ? 'white' : 'var(--color-gray-700)',
-                            transition: 'all var(--transition-base)'
-                        }}
-                    >
-                        Student
-                    </button>
-                    <button
-                        onClick={() => {
-                            setLoginType('admin');
-                            setError('');
-                            setCredentials({ username: '', password: '' });
-                        }}
-                        style={{
-                            flex: 1,
-                            padding: '0.75rem',
-                            borderRadius: 'var(--radius-lg)',
-                            fontWeight: 'var(--font-weight-semibold)',
-                            border: '2px solid',
-                            borderColor: loginType === 'admin' ? 'var(--color-primary)' : 'var(--color-gray-300)',
-                            background: loginType === 'admin' ? 'var(--color-primary)' : 'white',
-                            color: loginType === 'admin' ? 'white' : 'var(--color-gray-700)',
-                            transition: 'all var(--transition-base)'
-                        }}
-                    >
-                        Admin
-                    </button>
+                    {loginTypes.map((type) => (
+                        <button
+                            key={type.id}
+                            onClick={() => {
+                                setLoginType(type.id);
+                                setError('');
+                                setCredentials({ username: '', password: '' });
+                            }}
+                            style={{
+                                flex: 1,
+                                padding: '0.75rem',
+                                borderRadius: 'var(--radius-lg)',
+                                fontWeight: 'var(--font-weight-semibold)',
+                                border: '2px solid',
+                                borderColor: loginType === type.id ? 'var(--color-primary)' : 'var(--color-gray-300)',
+                                background: loginType === type.id ? 'var(--color-primary)' : 'white',
+                                color: loginType === type.id ? 'white' : 'var(--color-gray-700)',
+                                transition: 'all var(--transition-base)',
+                                fontSize: '0.9rem'
+                            }}
+                        >
+                            {type.label}
+                        </button>
+                    ))}
                 </div>
 
                 <form onSubmit={handleSubmit}>
                     <div style={{ marginBottom: '1.25rem' }}>
                         <label className="form-label">
-                            {loginType === 'student' ? 'Student ID' : 'Username'}
+                            {loginType === 'student' ? 'Student ID' : loginType === 'teacher' ? 'Username' : 'Username'}
                         </label>
                         <div style={{ position: 'relative' }}>
                             <User
@@ -162,7 +158,7 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setCurrentPage, setLoggedInStudent }
                                 className="form-input"
                                 style={{ paddingLeft: '3rem' }}
                                 required
-                                placeholder={loginType === 'student' ? 'STU001' : 'admin'}
+                                placeholder={loginType === 'student' ? 'STU001' : loginType === 'teacher' ? 'teacher' : 'admin'}
                                 autoComplete="username"
                             />
                         </div>
@@ -239,6 +235,9 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setCurrentPage, setLoggedInStudent }
                     </strong>
                     <div style={{ marginBottom: '0.5rem' }}>
                         <strong>Student:</strong> STU001 / demo123
+                    </div>
+                    <div style={{ marginBottom: '0.5rem' }}>
+                        <strong>Teacher:</strong> teacher / teacher123
                     </div>
                     <div>
                         <strong>Admin:</strong> admin / admin123

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import {
     User, Calendar, Award, BarChart3, BookOpen,
-    LogOut, TrendingUp, Clock
+    LogOut, TrendingUp, Clock, DollarSign, CheckCircle, XCircle
 } from 'lucide-react';
 
-const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStudent }) => {
+const StudentPortal = ({ student, studentsData, setIsLoggedIn, setCurrentPage, setLoggedInStudent }) => {
     const [activeTab, setActiveTab] = useState('overview');
 
     const handleLogout = () => {
@@ -15,9 +15,12 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
 
     if (!student) return null;
 
+    // Use live data from studentsData if available (updated by teacher), otherwise use the student prop
+    const liveStudent = studentsData ? studentsData.find(s => s.id === student.id) || student : student;
+
     // Calculate grade average
     const avgPercentage = (
-        student.results.reduce((sum, r) => sum + r.percentage, 0) / student.results.length
+        liveStudent.results.reduce((sum, r) => sum + r.percentage, 0) / liveStudent.results.length
     ).toFixed(1);
 
     return (
@@ -36,9 +39,9 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                                 fontWeight: 'var(--font-weight-bold)',
                                 marginBottom: '0.5rem'
                             }}>
-                                Welcome, {student.name.split(' ')[0]}!
+                                Welcome, {liveStudent.name.split(' ')[0]}!
                             </h1>
-                            <p style={{ opacity: 0.95 }}>{student.grade}</p>
+                            <p style={{ opacity: 0.95 }}>{liveStudent.grade}</p>
                         </div>
                         <button
                             onClick={handleLogout}
@@ -72,7 +75,8 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                             { id: 'overview', label: 'Overview', icon: BarChart3 },
                             { id: 'results', label: 'Results', icon: Award },
                             { id: 'attendance', label: 'Attendance', icon: Calendar },
-                            { id: 'schedule', label: 'Schedule', icon: Clock }
+                            { id: 'schedule', label: 'Schedule', icon: Clock },
+                            { id: 'fees', label: 'Fee Status', icon: DollarSign }
                         ].map((tab) => (
                             <button
                                 key={tab.id}
@@ -119,7 +123,7 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                                     <div className="flex-between">
                                         <div>
                                             <div style={{ fontSize: '2.5rem', fontWeight: 'var(--font-weight-bold)' }}>
-                                                {student.attendance.percentage}%
+                                                {liveStudent.attendance.percentage}%
                                             </div>
                                             <div style={{ opacity: 0.9 }}>Attendance</div>
                                         </div>
@@ -127,15 +131,15 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                                     </div>
                                 </div>
 
-                                <div className="card" style={{ background: 'var(--color-secondary)', color: 'white' }}>
+                                <div className="card" style={{ background: liveStudent.feeStatus === 'paid' ? 'var(--color-secondary)' : 'var(--color-danger)', color: 'white' }}>
                                     <div className="flex-between">
                                         <div>
-                                            <div style={{ fontSize: '2.5rem', fontWeight: 'var(--font-weight-bold)' }}>
-                                                {student.results.length}
+                                            <div style={{ fontSize: '2.5rem', fontWeight: 'var(--font-weight-bold)', textTransform: 'uppercase' }}>
+                                                {liveStudent.feeStatus || 'N/A'}
                                             </div>
-                                            <div style={{ opacity: 0.9 }}>Subjects</div>
+                                            <div style={{ opacity: 0.9 }}>Fee Status</div>
                                         </div>
-                                        <BookOpen size={40} style={{ opacity: 0.8 }} />
+                                        <DollarSign size={40} style={{ opacity: 0.8 }} />
                                     </div>
                                 </div>
                             </div>
@@ -148,7 +152,7 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                                 Recent Results
                             </h2>
                             <div className="grid grid-cols-2" style={{ gap: '1.5rem' }}>
-                                {student.results.slice(0, 4).map((result, idx) => (
+                                {liveStudent.results.slice(0, 4).map((result, idx) => (
                                     <div key={idx} className="card">
                                         <div className="flex-between" style={{ marginBottom: '0.5rem' }}>
                                             <h3 style={{ fontWeight: 'var(--font-weight-bold)' }}>
@@ -231,7 +235,7 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {student.results.map((result, idx) => (
+                                        {liveStudent.results.map((result, idx) => (
                                             <tr
                                                 key={idx}
                                                 style={{
@@ -296,7 +300,7 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                                         fontWeight: 'var(--font-weight-extrabold)',
                                         color: 'var(--color-success)'
                                     }}>
-                                        {student.attendance.present}
+                                        {liveStudent.attendance.present}
                                     </div>
                                     <div style={{ color: 'var(--color-gray-600)' }}>Days Present</div>
                                 </div>
@@ -307,7 +311,7 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                                         fontWeight: 'var(--font-weight-extrabold)',
                                         color: 'var(--color-danger)'
                                     }}>
-                                        {student.attendance.absent}
+                                        {liveStudent.attendance.absent}
                                     </div>
                                     <div style={{ color: 'var(--color-gray-600)' }}>Days Absent</div>
                                 </div>
@@ -318,7 +322,7 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                                         fontWeight: 'var(--font-weight-extrabold)',
                                         color: 'var(--color-primary)'
                                     }}>
-                                        {student.attendance.percentage}%
+                                        {liveStudent.attendance.percentage}%
                                     </div>
                                     <div style={{ color: 'var(--color-gray-600)' }}>Attendance Rate</div>
                                 </div>
@@ -338,7 +342,7 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                             </h2>
 
                             <div className="flex-col gap-2">
-                                {student.schedule.map((day, idx) => (
+                                {liveStudent.schedule.map((day, idx) => (
                                     <div key={idx} className="card">
                                         <h3 style={{
                                             fontSize: '1.25rem',
@@ -365,6 +369,48 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Fee Status Tab */}
+                    {activeTab === 'fees' && (
+                        <div className="animate-fade-in">
+                            <h2 style={{
+                                fontSize: '1.75rem',
+                                fontWeight: 'var(--font-weight-bold)',
+                                marginBottom: '1.5rem'
+                            }}>
+                                Fee Status
+                            </h2>
+
+                            <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+                                <div className="flex-center" style={{
+                                    width: '80px',
+                                    height: '80px',
+                                    borderRadius: '50%',
+                                    background: liveStudent.feeStatus === 'paid' ? 'var(--color-success)' : 'var(--color-danger)',
+                                    color: 'white',
+                                    margin: '0 auto 1.5rem'
+                                }}>
+                                    {liveStudent.feeStatus === 'paid' ? <CheckCircle size={40} /> : <XCircle size={40} />}
+                                </div>
+
+                                <div style={{
+                                    fontSize: '2rem',
+                                    fontWeight: 'var(--font-weight-bold)',
+                                    color: liveStudent.feeStatus === 'paid' ? 'var(--color-success)' : 'var(--color-danger)',
+                                    textTransform: 'uppercase',
+                                    marginBottom: '0.5rem'
+                                }}>
+                                    {liveStudent.feeStatus || 'N/A'}
+                                </div>
+
+                                <p style={{ color: 'var(--color-gray-600)', fontSize: '1.1rem' }}>
+                                    {liveStudent.feeStatus === 'paid'
+                                        ? 'Your fees have been paid. Thank you!'
+                                        : 'Your fees are pending. Please contact the school office.'}
+                                </p>
                             </div>
                         </div>
                     )}

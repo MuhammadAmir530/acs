@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Menu, X, School, LogIn } from 'lucide-react';
 
-const Navbar = ({ currentPage, setCurrentPage, isLoggedIn, isAdmin }) => {
+const Navbar = ({ currentPage, setCurrentPage, isLoggedIn, isAdmin, isTeacher }) => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const navItems = [
@@ -85,12 +85,14 @@ const Navbar = ({ currentPage, setCurrentPage, isLoggedIn, isAdmin }) => {
                         ))}
 
                         <button
-                            onClick={() => handleNavClick(isLoggedIn || isAdmin ? 'portal' : 'login')}
+                            onClick={() => handleNavClick(
+                                isLoggedIn ? 'portal' : isAdmin ? 'admin' : isTeacher ? 'teacher' : 'login'
+                            )}
                             className="btn btn-primary btn-sm"
                             style={{ marginLeft: '0.5rem' }}
                         >
                             <LogIn size={18} />
-                            {isLoggedIn || isAdmin ? 'Portal' : 'Login'}
+                            {isLoggedIn ? 'Student Portal' : isAdmin ? 'Admin Panel' : isTeacher ? 'Teacher Portal' : 'Login'}
                         </button>
                     </div>
 
@@ -141,12 +143,14 @@ const Navbar = ({ currentPage, setCurrentPage, isLoggedIn, isAdmin }) => {
                         ))}
 
                         <button
-                            onClick={() => handleNavClick(isLoggedIn || isAdmin ? 'portal' : 'login')}
+                            onClick={() => handleNavClick(
+                                isLoggedIn ? 'portal' : isAdmin ? 'admin' : isTeacher ? 'teacher' : 'login'
+                            )}
                             className="btn btn-primary"
                             style={{ width: '100%', marginTop: '0.5rem' }}
                         >
                             <LogIn size={18} />
-                            {isLoggedIn || isAdmin ? 'Portal' : 'Login'}
+                            {isLoggedIn ? 'Student Portal' : isAdmin ? 'Admin Panel' : isTeacher ? 'Teacher Portal' : 'Login'}
                         </button>
                     </div>
                 </div>
