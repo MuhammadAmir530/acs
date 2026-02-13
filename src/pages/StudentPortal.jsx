@@ -5,7 +5,7 @@ import {
     ArrowUp, ArrowDown, Minus, BookMarked
 } from 'lucide-react';
 
-const StudentPortal = ({ student, studentsData, setIsLoggedIn, setCurrentPage, setLoggedInStudent }) => {
+const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStudent }) => {
     const [activeTab, setActiveTab] = useState('overview');
     const [selectedPrevTerm, setSelectedPrevTerm] = useState(0);
 

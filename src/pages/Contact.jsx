@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Send, MapPin, Phone, Mail, Clock, CheckCircle } from 'lucide-react';
-import { schoolData } from '../data/schoolData';
+import { useSchoolData } from '../context/SchoolDataContext';
 
 const Contact = () => {
+    const { schoolData } = useSchoolData();
     const [formData, setFormData] = useState({
         name: '',
         email: '',

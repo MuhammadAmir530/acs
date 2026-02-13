@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { SchoolDataProvider } from './context/SchoolDataContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
@@ -17,7 +18,6 @@ function App() {
     const [isAdmin, setIsAdmin] = useState(false);
     const [isTeacher, setIsTeacher] = useState(false);
     const [loggedInStudent, setLoggedInStudent] = useState(null);
-    const [studentsData, setStudentsData] = useState(null);
 
     const renderPage = () => {
         switch (currentPage) {
@@ -45,7 +45,6 @@ function App() {
                 return (
                     <StudentPortal
                         student={loggedInStudent}
-                        studentsData={studentsData}
                         setIsLoggedIn={setIsLoggedIn}
                         setCurrentPage={setCurrentPage}
                         setLoggedInStudent={setLoggedInStudent}
@@ -63,8 +62,6 @@ function App() {
                     <TeacherPortal
                         setIsTeacher={setIsTeacher}
                         setCurrentPage={setCurrentPage}
-                        studentsData={studentsData}
-                        setStudentsData={setStudentsData}
                     />
                 );
             default:
@@ -73,19 +70,21 @@ function App() {
     };
 
     return (
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-            <Navbar
-                currentPage={currentPage}
-                setCurrentPage={setCurrentPage}
-                isLoggedIn={isLoggedIn}
-                isAdmin={isAdmin}
-                isTeacher={isTeacher}
-            />
-            <main style={{ flex: 1 }}>
-                {renderPage()}
-            </main>
-            <Footer />
-        </div>
+        <SchoolDataProvider>
+            <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+                <Navbar
+                    currentPage={currentPage}
+                    setCurrentPage={setCurrentPage}
+                    isLoggedIn={isLoggedIn}
+                    isAdmin={isAdmin}
+                    isTeacher={isTeacher}
+                />
+                <main style={{ flex: 1 }}>
+                    {renderPage()}
+                </main>
+                <Footer />
+            </div>
+        </SchoolDataProvider>
     );
 }
 

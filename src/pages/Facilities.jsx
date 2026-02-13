@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { schoolData } from '../data/schoolData';
+import { useSchoolData } from '../context/SchoolDataContext';
 
 const Facilities = () => {
+    const { schoolData } = useSchoolData();
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [lightboxImage, setLightboxImage] = useState(null);
 

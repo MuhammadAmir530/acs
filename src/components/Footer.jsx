@@ -1,8 +1,9 @@
 import React from 'react';
 import { Phone, Mail, MapPin, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
-import { schoolData } from '../data/schoolData';
+import { useSchoolData } from '../context/SchoolDataContext';
 
 const Footer = () => {
+    const { schoolData } = useSchoolData();
     return (
         <footer style={{
             background: 'var(--color-gray-900)',

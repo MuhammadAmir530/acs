@@ -5,9 +5,10 @@ import {
     Download, Upload
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { schoolData } from '../data/schoolData';
+import { useSchoolData } from '../context/SchoolDataContext';
 
-const TeacherPortal = ({ setIsTeacher, setCurrentPage, studentsData, setStudentsData }) => {
+const TeacherPortal = ({ setIsTeacher, setCurrentPage }) => {
+    const { schoolData, setStudents } = useSchoolData();
     const [activeTab, setActiveTab] = useState('marks');
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [editingMarks, setEditingMarks] = useState(false);
@@ -17,18 +18,7 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage, studentsData, setStudents
     const marksFileRef = useRef(null);
     const feeFileRef = useRef(null);
 
-    // Initialize students data from schoolData on first load
-    useEffect(() => {
-        if (!studentsData) {
-            setStudentsData([...schoolData.students.map(s => ({
-                ...s,
-                results: [...s.results.map(r => ({ ...r }))],
-                attendance: { ...s.attendance }
-            }))]);
-        }
-    }, [studentsData, setStudentsData]);
-
-    const students = studentsData || schoolData.students;
+    const students = schoolData.students || [];
 
     const handleLogout = () => {
         setIsTeacher(false);
@@ -78,7 +68,7 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage, studentsData, setStudents
             }
             return s;
         });
-        setStudentsData(updatedStudents);
+        setStudents(updatedStudents);
         setEditingMarks(false);
         showSaveMessage('Marks saved successfully!');
     };
@@ -140,7 +130,7 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage, studentsData, setStudents
                     }
                     return s;
                 });
-                setStudentsData(updatedStudents);
+                setStudents(updatedStudents);
                 showSaveMessage(`Marks imported for ${data.length} entries!`);
             } catch (err) {
                 showSaveMessage('Error reading file. Please check the format.');
@@ -168,7 +158,7 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage, studentsData, setStudents
             }
             return s;
         });
-        setStudentsData(updatedStudents);
+        setStudents(updatedStudents);
         showSaveMessage(`Attendance marked for ${students.find(s => s.id === studentId).name}!`);
     };
 
@@ -230,7 +220,7 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage, studentsData, setStudents
                     }
                     return s;
                 });
-                setStudentsData(updatedStudents);
+                setStudents(updatedStudents);
                 showSaveMessage(`Attendance imported for ${updateCount} students!`);
             } catch (err) {
                 showSaveMessage('Error reading file. Please check the format.');
@@ -251,7 +241,7 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage, studentsData, setStudents
             }
             return s;
         });
-        setStudentsData(updatedStudents);
+        setStudents(updatedStudents);
         const student = students.find(s => s.id === studentId);
         const newStatus = student.feeStatus === 'paid' ? 'Unpaid' : 'Paid';
         showSaveMessage(`Fee status updated to ${newStatus} for ${student.name}!`);
@@ -301,7 +291,7 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage, studentsData, setStudents
                     }
                     return s;
                 });
-                setStudentsData(updatedStudents);
+                setStudents(updatedStudents);
                 showSaveMessage(`Fee status imported for ${updateCount} students!`);
             } catch (err) {
                 showSaveMessage('Error reading file. Please check the format.');

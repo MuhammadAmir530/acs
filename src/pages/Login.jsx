@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { LogIn, User, Lock, AlertCircle } from 'lucide-react';
-import { schoolData, adminCredentials, teacherCredentials } from '../data/schoolData';
+import { adminCredentials, teacherCredentials } from '../data/schoolData';
+import { useSchoolData } from '../context/SchoolDataContext';
 
 const Login = ({ setIsLoggedIn, setIsAdmin, setIsTeacher, setCurrentPage, setLoggedInStudent }) => {
+    const { schoolData } = useSchoolData();
     const [loginType, setLoginType] = useState('student'); // 'student', 'teacher', or 'admin'
     const [credentials, setCredentials] = useState({
         username: '',

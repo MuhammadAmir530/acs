@@ -1,8 +1,9 @@
 import React from 'react';
 import { ArrowRight, Users, Globe, Award, TrendingUp, BookOpen, Heart } from 'lucide-react';
-import { schoolData } from '../data/schoolData';
+import { useSchoolData } from '../context/SchoolDataContext';
 
 const Home = ({ setCurrentPage }) => {
+    const { schoolData } = useSchoolData();
     return (
         <div>
             {/* Hero Section */}

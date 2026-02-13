@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Mail, Briefcase } from 'lucide-react';
-import { schoolData } from '../data/schoolData';
+import { useSchoolData } from '../context/SchoolDataContext';
 
 const Faculty = ({ isAdmin }) => {
+    const { schoolData } = useSchoolData();
     const [selectedDept, setSelectedDept] = useState('All');
 
     const departments = ['All', 'Administration', 'Academic Leadership', 'Science', 'Mathematics', 'Athletics', 'Fine Arts'];

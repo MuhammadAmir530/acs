@@ -5,18 +5,20 @@ import {
     BarChart3, GraduationCap, DollarSign, CheckCircle,
     XCircle, X, School
 } from 'lucide-react';
-import { schoolData } from '../data/schoolData';
+import { useSchoolData } from '../context/SchoolDataContext';
 
 const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
+    const { schoolData, updateSchoolInfo, updateAbout, updateContact, setFaculty: setContextFaculty, setFacilities: setContextFacilities } = useSchoolData();
+
     const [activeSection, setActiveSection] = useState('dashboard');
     const [isEditing, setIsEditing] = useState(false);
     const [saveMessage, setSaveMessage] = useState('');
 
-    // School info state
+    // School info state - initialized from context
     const [schoolInfo, setSchoolInfo] = useState({
-        name: schoolData.schoolName || 'ACS Higher Secondary School',
+        name: schoolData.name || 'ACS Higher Secondary School',
         tagline: schoolData.tagline || 'Ready to Lead. Ready to Inspire.',
-        description: schoolData.hero?.description || 'A world-class education that empowers students to reach their full potential.',
+        description: schoolData.description || 'A world-class education that empowers students to reach their full potential.',
         phone: schoolData.contact?.phone || '0300 1333275',
         email: schoolData.contact?.email || 'Infoacspainsra@gmail.com',
         address: schoolData.contact?.address || 'ACS Higher Secondary School, Jhang Road Painsra, Pakistan',
@@ -24,14 +26,12 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
         vision: schoolData.about?.vision || ''
     });
 
-    // Faculty state
-    const [faculty, setFaculty] = useState([...schoolData.faculty]);
+    // Faculty & Facilities use context data directly
     const [editingFacultyId, setEditingFacultyId] = useState(null);
+    const faculty = schoolData.faculty || [];
+    const facilities = schoolData.facilities || [];
 
-    // Facilities state
-    const [facilities, setFacilities] = useState([...schoolData.facilities]);
-
-    // Students overview (read-only from schoolData)
+    // Students overview (from context)
     const students = schoolData.students || [];
 
     const handleLogout = () => {
@@ -331,7 +331,13 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
                                                 <Edit3 size={16} /> Edit
                                             </button>
                                         ) : (
-                                            <button onClick={() => { setIsEditing(false); showSave('School info saved!'); }} style={{
+                                            <button onClick={() => {
+                                                setIsEditing(false);
+                                                updateSchoolInfo({ name: schoolInfo.name, tagline: schoolInfo.tagline, description: schoolInfo.description });
+                                                updateContact({ phone: schoolInfo.phone, email: schoolInfo.email, address: schoolInfo.address });
+                                                updateAbout({ mission: schoolInfo.mission, vision: schoolInfo.vision });
+                                                showSave('School info saved!');
+                                            }} style={{
                                                 display: 'flex', alignItems: 'center', gap: '0.4rem',
                                                 padding: '0.6rem 1.2rem', borderRadius: '10px',
                                                 background: '#10b981', color: 'white',
@@ -440,7 +446,7 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
                                         <button
                                             onClick={() => {
                                                 const newId = Math.max(...faculty.map(f => f.id)) + 1;
-                                                setFaculty([...faculty, {
+                                                setContextFaculty([...faculty, {
                                                     id: newId,
                                                     name: 'New Faculty Member',
                                                     role: 'Teacher',
@@ -504,7 +510,7 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
                                                                 <input
                                                                     type="text"
                                                                     value={member.name}
-                                                                    onChange={(e) => setFaculty(faculty.map(f => f.id === member.id ? { ...f, name: e.target.value } : f))}
+                                                                    onChange={(e) => setContextFaculty(faculty.map(f => f.id === member.id ? { ...f, name: e.target.value } : f))}
                                                                     style={{ ...inputStyle, background: 'white', borderColor: '#3b82f6' }}
                                                                 />
                                                             </div>
@@ -513,7 +519,7 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
                                                                 <input
                                                                     type="text"
                                                                     value={member.role}
-                                                                    onChange={(e) => setFaculty(faculty.map(f => f.id === member.id ? { ...f, role: e.target.value } : f))}
+                                                                    onChange={(e) => setContextFaculty(faculty.map(f => f.id === member.id ? { ...f, role: e.target.value } : f))}
                                                                     style={{ ...inputStyle, background: 'white', borderColor: '#3b82f6' }}
                                                                 />
                                                             </div>
@@ -522,7 +528,7 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
                                                                 <input
                                                                     type="text"
                                                                     value={member.department}
-                                                                    onChange={(e) => setFaculty(faculty.map(f => f.id === member.id ? { ...f, department: e.target.value } : f))}
+                                                                    onChange={(e) => setContextFaculty(faculty.map(f => f.id === member.id ? { ...f, department: e.target.value } : f))}
                                                                     style={{ ...inputStyle, background: 'white', borderColor: '#3b82f6' }}
                                                                 />
                                                             </div>
@@ -531,7 +537,7 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
                                                                 <input
                                                                     type="text"
                                                                     value={member.image}
-                                                                    onChange={(e) => setFaculty(faculty.map(f => f.id === member.id ? { ...f, image: e.target.value } : f))}
+                                                                    onChange={(e) => setContextFaculty(faculty.map(f => f.id === member.id ? { ...f, image: e.target.value } : f))}
                                                                     style={{ ...inputStyle, background: 'white', borderColor: '#3b82f6' }}
                                                                 />
                                                             </div>
@@ -540,7 +546,7 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
                                                                 <input
                                                                     type="text"
                                                                     value={member.bio}
-                                                                    onChange={(e) => setFaculty(faculty.map(f => f.id === member.id ? { ...f, bio: e.target.value } : f))}
+                                                                    onChange={(e) => setContextFaculty(faculty.map(f => f.id === member.id ? { ...f, bio: e.target.value } : f))}
                                                                     style={{ ...inputStyle, background: 'white', borderColor: '#3b82f6' }}
                                                                 />
                                                             </div>
@@ -571,7 +577,7 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
                                                             </button>
                                                             <button
                                                                 onClick={() => {
-                                                                    setFaculty(faculty.filter(f => f.id !== member.id));
+                                                                    setContextFaculty(faculty.filter(f => f.id !== member.id));
                                                                     showSave('Faculty member removed');
                                                                 }}
                                                                 style={{
@@ -599,7 +605,7 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
                                         <button
                                             onClick={() => {
                                                 const newId = Math.max(...facilities.map(f => f.id)) + 1;
-                                                setFacilities([...facilities, {
+                                                setContextFacilities([...facilities, {
                                                     id: newId,
                                                     name: 'New Facility',
                                                     description: 'Description here',
@@ -644,7 +650,7 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
                                                         </div>
                                                         <button
                                                             onClick={() => {
-                                                                setFacilities(facilities.filter(f => f.id !== facility.id));
+                                                                setContextFacilities(facilities.filter(f => f.id !== facility.id));
                                                                 showSave('Facility removed');
                                                             }}
                                                             style={{

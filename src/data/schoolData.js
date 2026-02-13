@@ -22,9 +22,9 @@ export const schoolData = {
         ],
         history: "Founded on excellence, ACS Higher Secondary School has grown to become a premier educational institution, providing quality education and fostering academic excellence.",
         accreditations: [
-            "Council of International Schools (CIS)",
-            "New England Association of Schools and Colleges (NEASC)",
-            "International Baccalaureate (IB) World School"
+            "HIGHER EDUCATION COMMISSION (HEC)",
+            "BOARD OF INTERMEDIATE AND SECONDARY EDUCATION (BISE), FAISALABAD",
+            "FAISALABAD PRIVATE SCHOOL FORUM"
         ]
     },
 

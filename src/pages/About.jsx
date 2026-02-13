@@ -1,8 +1,9 @@
 import React from 'react';
 import { Target, Eye, Award, CheckCircle } from 'lucide-react';
-import { schoolData } from '../data/schoolData';
+import { useSchoolData } from '../context/SchoolDataContext';
 
 const About = () => {
+    const { schoolData } = useSchoolData();
     return (
         <div>
             {/* Header */}
