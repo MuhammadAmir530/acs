@@ -11,8 +11,8 @@ export const schoolData = {
     },
 
     about: {
-        mission: "To inspire the world's next global thinkers through a challenging, innovative curriculum that develops critical thinking, creativity, and leadership skills.",
-        vision: "Creating a caring, inclusive community where every individual is empowered to reach their full potential and become a responsible global citizen.",
+        mission: "At ACS Higher Secondary School, our mission is to shape confident, principled, and forward-thinking individuals who excel not only in academics but in life. We are dedicated to providing a comprehensive, well-structured education rooted in academic rigor, moral integrity, and critical inquiry. Within a safe, disciplined, and nurturing environment, we empower students to think independently, act responsibly, and lead with compassion. By embracing modern teaching practices, leveraging technology as a learning tool, and promoting active, experiential engagement, we prepare our students to succeed beyond the classroom—as lifelong learners, ethical citizens, and change-makers ready to meet the challenges of an ever-evolving world.",
+        vision: "Our vision is to establish ACS Higher Secondary School as a transformative force in education—renowned for uncompromising academic excellence, pioneering innovation, and the holistic empowerment of every student. We aspire to cultivate a generation of ethical, dynamic leaders who are not only knowledgeable and skilled but deeply principled and adaptable to the demands of a rapidly changing world. By embracing the power of modern technology, including AI-enhanced learning, while steadfastly upholding values of respect, discipline, integrity, and lifelong growth, we are shaping a future where education transcends boundaries and where every student becomes a catalyst for positive change..",
         values: [
             "Excellence in Education",
             "Integrity and Respect",
@@ -176,12 +176,27 @@ export const schoolData = {
                 total: 175,
                 percentage: 98.3
             },
-            schedule: [
-                { day: "Monday", periods: ["Math", "Physics", "English", "Urdu", "Break", "Chemistry"] },
-                { day: "Tuesday", periods: ["English", "Math", "PE", "Chemistry", "Break", "Physics"] },
-                { day: "Wednesday", periods: ["Urdu", "Chemistry", "Math", "English", "Break", "Art"] },
-                { day: "Thursday", periods: ["Physics", "English", "Urdu", "Math", "Break", "Music"] },
-                { day: "Friday", periods: ["Chemistry", "Math", "Physics", "English", "Break", "Study Hall"] }
+            previousResults: [
+                {
+                    term: "Term 1 — 2025",
+                    results: [
+                        { subject: "Mathematics", grade: "A-", percentage: 88 },
+                        { subject: "Physics", grade: "B+", percentage: 84 },
+                        { subject: "English", grade: "B+", percentage: 82 },
+                        { subject: "Urdu", grade: "A-", percentage: 87 },
+                        { subject: "Chemistry", grade: "B+", percentage: 83 }
+                    ]
+                },
+                {
+                    term: "Term 2 — 2025",
+                    results: [
+                        { subject: "Mathematics", grade: "A", percentage: 90 },
+                        { subject: "Physics", grade: "A-", percentage: 86 },
+                        { subject: "English", grade: "B+", percentage: 84 },
+                        { subject: "Urdu", grade: "A", percentage: 89 },
+                        { subject: "Chemistry", grade: "A-", percentage: 85 }
+                    ]
+                }
             ]
         },
         {
@@ -203,12 +218,27 @@ export const schoolData = {
                 total: 175,
                 percentage: 91.4
             },
-            schedule: [
-                { day: "Monday", periods: ["English", "Math", "Physics", "Chemistry", "Break", "Urdu"] },
-                { day: "Tuesday", periods: ["Math", "Chemistry", "Urdu", "English", "Break", "Physics"] },
-                { day: "Wednesday", periods: ["Physics", "Urdu", "English", "Math", "Break", "PE"] },
-                { day: "Thursday", periods: ["Chemistry", "English", "Math", "Physics", "Break", "Art"] },
-                { day: "Friday", periods: ["Urdu", "Math", "Chemistry", "English", "Break", "Study Hall"] }
+            previousResults: [
+                {
+                    term: "Term 1 — 2025",
+                    results: [
+                        { subject: "Mathematics", grade: "B", percentage: 78 },
+                        { subject: "Physics", grade: "B-", percentage: 72 },
+                        { subject: "English", grade: "B+", percentage: 84 },
+                        { subject: "Urdu", grade: "A-", percentage: 87 },
+                        { subject: "Chemistry", grade: "B", percentage: 77 }
+                    ]
+                },
+                {
+                    term: "Term 2 — 2025",
+                    results: [
+                        { subject: "Mathematics", grade: "B+", percentage: 82 },
+                        { subject: "Physics", grade: "B", percentage: 75 },
+                        { subject: "English", grade: "A-", percentage: 86 },
+                        { subject: "Urdu", grade: "A-", percentage: 89 },
+                        { subject: "Chemistry", grade: "B+", percentage: 80 }
+                    ]
+                }
             ]
         },
         {
@@ -230,12 +260,27 @@ export const schoolData = {
                 total: 175,
                 percentage: 97.1
             },
-            schedule: [
-                { day: "Monday", periods: ["Math", "Physics", "English", "Urdu", "Break", "Chemistry"] },
-                { day: "Tuesday", periods: ["English", "Math", "PE", "Chemistry", "Break", "Physics"] },
-                { day: "Wednesday", periods: ["Urdu", "Chemistry", "Math", "English", "Break", "Art"] },
-                { day: "Thursday", periods: ["Physics", "English", "Urdu", "Math", "Break", "Music"] },
-                { day: "Friday", periods: ["Chemistry", "Math", "Physics", "English", "Break", "Study Hall"] }
+            previousResults: [
+                {
+                    term: "Term 1 — 2025",
+                    results: [
+                        { subject: "Mathematics", grade: "A-", percentage: 90 },
+                        { subject: "Physics", grade: "A-", percentage: 89 },
+                        { subject: "English", grade: "B+", percentage: 84 },
+                        { subject: "Urdu", grade: "B", percentage: 80 },
+                        { subject: "Chemistry", grade: "A-", percentage: 88 }
+                    ]
+                },
+                {
+                    term: "Term 2 — 2025",
+                    results: [
+                        { subject: "Mathematics", grade: "A", percentage: 93 },
+                        { subject: "Physics", grade: "A", percentage: 91 },
+                        { subject: "English", grade: "A-", percentage: 86 },
+                        { subject: "Urdu", grade: "B+", percentage: 83 },
+                        { subject: "Chemistry", grade: "A", percentage: 92 }
+                    ]
+                }
             ]
         },
         {
@@ -257,12 +302,27 @@ export const schoolData = {
                 total: 175,
                 percentage: 88.6
             },
-            schedule: [
-                { day: "Monday", periods: ["English", "Physics", "Math", "Urdu", "Break", "Chemistry"] },
-                { day: "Tuesday", periods: ["Math", "English", "Chemistry", "Physics", "Break", "PE"] },
-                { day: "Wednesday", periods: ["Urdu", "Math", "English", "Chemistry", "Break", "Art"] },
-                { day: "Thursday", periods: ["Physics", "Urdu", "Math", "English", "Break", "Music"] },
-                { day: "Friday", periods: ["Chemistry", "English", "Physics", "Math", "Break", "Study Hall"] }
+            previousResults: [
+                {
+                    term: "Term 1 — 2025",
+                    results: [
+                        { subject: "Mathematics", grade: "C+", percentage: 68 },
+                        { subject: "Physics", grade: "C+", percentage: 65 },
+                        { subject: "English", grade: "B", percentage: 76 },
+                        { subject: "Urdu", grade: "B+", percentage: 82 },
+                        { subject: "Chemistry", grade: "C+", percentage: 67 }
+                    ]
+                },
+                {
+                    term: "Term 2 — 2025",
+                    results: [
+                        { subject: "Mathematics", grade: "B-", percentage: 72 },
+                        { subject: "Physics", grade: "B-", percentage: 70 },
+                        { subject: "English", grade: "B+", percentage: 80 },
+                        { subject: "Urdu", grade: "A-", percentage: 85 },
+                        { subject: "Chemistry", grade: "B-", percentage: 71 }
+                    ]
+                }
             ]
         }
     ]
