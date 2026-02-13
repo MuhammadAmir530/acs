@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Users, Award, Calendar, DollarSign, LogOut,
     Save, CheckCircle, XCircle, Edit3, User,
-    Download, Upload, FileText
+    Download, Upload, FileText, Search
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useSchoolData } from '../context/SchoolDataContext';
@@ -14,6 +14,7 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage }) => {
     const [editingMarks, setEditingMarks] = useState(false);
     const [tempMarks, setTempMarks] = useState([]);
     const [saveMessage, setSaveMessage] = useState('');
+    const [reportSearch, setReportSearch] = useState('');
     const attendanceFileRef = useRef(null);
     const marksFileRef = useRef(null);
     const feeFileRef = useRef(null);
@@ -1262,15 +1263,43 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage }) => {
                     {activeTab === 'reports' && (
                         <div className="animate-fade-in">
                             <div className="flex-between" style={{ marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                                <h2 style={{
-                                    fontSize: '1.75rem',
-                                    fontWeight: 'var(--font-weight-bold)'
-                                }}>
-                                    Student Reports
-                                </h2>
-                                <p style={{ color: 'var(--color-gray-600)', fontSize: '0.95rem' }}>
-                                    Generate and download comprehensive report cards for each student
-                                </p>
+                                <div>
+                                    <h2 style={{
+                                        fontSize: '1.75rem',
+                                        fontWeight: 'var(--font-weight-bold)'
+                                    }}>
+                                        Student Reports
+                                    </h2>
+                                    <p style={{ color: 'var(--color-gray-600)', fontSize: '0.95rem', marginTop: '0.25rem' }}>
+                                        Generate and download comprehensive report cards for each student
+                                    </p>
+                                </div>
+                                <div style={{ position: 'relative', minWidth: '280px' }}>
+                                    <Search size={18} style={{
+                                        position: 'absolute', left: '14px', top: '50%',
+                                        transform: 'translateY(-50%)', color: 'var(--color-gray-400)',
+                                        pointerEvents: 'none'
+                                    }} />
+                                    <input
+                                        type="text"
+                                        placeholder="Search by name or ID..."
+                                        value={reportSearch}
+                                        onChange={(e) => setReportSearch(e.target.value)}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.75rem 1rem 0.75rem 2.75rem',
+                                            borderRadius: '12px',
+                                            border: '2px solid var(--color-gray-200)',
+                                            fontSize: '0.95rem',
+                                            outline: 'none',
+                                            background: 'white',
+                                            transition: 'border-color 0.2s, box-shadow 0.2s',
+                                            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                                        }}
+                                        onFocus={(e) => { e.target.style.borderColor = '#7c3aed'; e.target.style.boxShadow = '0 0 0 3px rgba(124,58,237,0.1)'; }}
+                                        onBlur={(e) => { e.target.style.borderColor = 'var(--color-gray-200)'; e.target.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)'; }}
+                                    />
+                                </div>
                             </div>
 
                             <div style={{
@@ -1278,7 +1307,11 @@ const TeacherPortal = ({ setIsTeacher, setCurrentPage }) => {
                                 gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
                                 gap: '1.25rem'
                             }}>
-                                {students.map((student) => {
+                                {students.filter(s => {
+                                    if (!reportSearch.trim()) return true;
+                                    const q = reportSearch.toLowerCase();
+                                    return s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || s.grade.toLowerCase().includes(q);
+                                }).map((student) => {
                                     const sAvg = (student.results.reduce((sum, r) => sum + r.percentage, 0) / student.results.length).toFixed(1);
                                     return (
                                         <div key={student.id} className="card" style={{

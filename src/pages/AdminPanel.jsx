@@ -3,7 +3,7 @@ import {
     Settings, Edit3, Save, LogOut, BookOpen,
     Users, Building, Info, PlusCircle, Trash2,
     BarChart3, GraduationCap, DollarSign, CheckCircle,
-    XCircle, X, School
+    XCircle, X, School, Search
 } from 'lucide-react';
 import { useSchoolData } from '../context/SchoolDataContext';
 
@@ -13,6 +13,7 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
     const [activeSection, setActiveSection] = useState('dashboard');
     const [isEditing, setIsEditing] = useState(false);
     const [saveMessage, setSaveMessage] = useState('');
+    const [dashboardSearch, setDashboardSearch] = useState('');
 
     // School info state - initialized from context
     const [schoolInfo, setSchoolInfo] = useState({
@@ -257,7 +258,34 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
 
                                     {/* Students list */}
                                     <div style={cardStyle}>
-                                        <h3 style={{ fontWeight: 700, marginBottom: '1rem', color: '#1e293b' }}>👥 Registered Students</h3>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+                                            <h3 style={{ fontWeight: 700, color: '#1e293b', margin: 0 }}>👥 Registered Students</h3>
+                                            <div style={{ position: 'relative', minWidth: '260px' }}>
+                                                <Search size={18} style={{
+                                                    position: 'absolute', left: '14px', top: '50%',
+                                                    transform: 'translateY(-50%)', color: '#94a3b8',
+                                                    pointerEvents: 'none'
+                                                }} />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search students..."
+                                                    value={dashboardSearch}
+                                                    onChange={(e) => setDashboardSearch(e.target.value)}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '0.65rem 1rem 0.65rem 2.6rem',
+                                                        borderRadius: '10px',
+                                                        border: '2px solid #e2e8f0',
+                                                        fontSize: '0.9rem',
+                                                        outline: 'none',
+                                                        background: '#f8fafc',
+                                                        transition: 'border-color 0.2s, box-shadow 0.2s'
+                                                    }}
+                                                    onFocus={(e) => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)'; e.target.style.background = 'white'; }}
+                                                    onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; e.target.style.background = '#f8fafc'; }}
+                                                />
+                                            </div>
+                                        </div>
                                         <div style={{ overflowX: 'auto' }}>
                                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                                 <thead>
@@ -273,7 +301,11 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {students.map((s) => {
+                                                    {students.filter(s => {
+                                                        if (!dashboardSearch.trim()) return true;
+                                                        const q = dashboardSearch.toLowerCase();
+                                                        return s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || s.grade.toLowerCase().includes(q);
+                                                    }).map((s) => {
                                                         const sAvg = (s.results.reduce((sum, r) => sum + r.percentage, 0) / s.results.length).toFixed(1);
                                                         return (
                                                             <tr key={s.id} style={{ borderTop: '1px solid #f1f5f9' }}>
