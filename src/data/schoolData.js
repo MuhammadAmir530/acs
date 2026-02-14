@@ -1,3 +1,14 @@
+export const CLASSES = [
+    "Play Group", "Nursery", "K.G.", "One", "Two", "Three", "Four", "Five",
+    "Six boys", "Six girls", "Seven boys", "Seven girls", "Eight boys", "Eight girls",
+    "9th boys bio", "9th boys computer", "9th girls bio", "9th girls computer",
+    "10th boys bio", "10th boys computer", "10th girls bio", "10th girls computer",
+    "1st year pre-engineering", "1st year pre-medical", "1st year ICS", "1st year FA", "1st year FA IT",
+    "1st year girls pre-engineering", "1st year girls pre-medical", "1st year girls ICS", "1st year girls FA", "1st year girls FA IT",
+    "2nd year pre-engineering", "2nd year pre-medical", "2nd year ICS", "2nd year FA", "2nd year FA IT",
+    "2nd year girls pre-engineering", "2nd year girls pre-medical", "2nd year girls ICS", "2nd year girls FA", "2nd year girls FA IT"
+];
+
 export const schoolData = {
     name: "ACS School & College",
     tagline: "Inspiring Excellence, Empowering Leaders.",
@@ -161,7 +172,7 @@ export const schoolData = {
             id: "STU001",
             password: "demo123",
             name: "Muhammad Amir",
-            grade: "Grade 11",
+            grade: "2nd year ICS",
             feeStatus: "paid",
             results: [
                 { subject: "Mathematics", grade: "A", percentage: 92 },
@@ -203,7 +214,7 @@ export const schoolData = {
             id: "STU002",
             password: "demo123",
             name: "Muhammad Ali",
-            grade: "Grade 10",
+            grade: "10th boys computer",
             feeStatus: "unpaid",
             results: [
                 { subject: "Mathematics", grade: "B+", percentage: 85 },
@@ -245,7 +256,7 @@ export const schoolData = {
             id: "STU003",
             password: "demo123",
             name: "Hafiz Muhammad Usman",
-            grade: "Grade 11",
+            grade: "2nd year ICS",
             feeStatus: "paid",
             results: [
                 { subject: "Mathematics", grade: "A", percentage: 95 },
@@ -287,7 +298,7 @@ export const schoolData = {
             id: "STU004",
             password: "demo123",
             name: "Ahmed Hassan",
-            grade: "Grade 9",
+            grade: "9th boys bio",
             feeStatus: "unpaid",
             results: [
                 { subject: "Mathematics", grade: "B", percentage: 76 },

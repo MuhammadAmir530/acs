@@ -300,8 +300,8 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                                                             transition: 'width 1s ease-out'
                                                         }} />
                                                     </div>
-                                                    <div style={{ width: '50px', textAlign: 'right', fontWeight: 700, color: getGradeColor(result.percentage) }}>
-                                                        {result.percentage}%
+                                                    <div style={{ width: '80px', textAlign: 'right', fontWeight: 700, color: getGradeColor(result.percentage), fontSize: '0.8rem' }}>
+                                                        {result.obtained !== undefined ? `${result.obtained}/${result.total || 100}` : `${result.percentage}%`}
                                                     </div>
                                                     <span style={{
                                                         background: '#f1f5f9', borderRadius: '6px',
@@ -404,7 +404,7 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                                 </div>
                                 <div style={{ textAlign: 'center' }}>
                                     <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#f59e0b' }}>{weakestSubject.subject}</div>
-                                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Needs Focus ({weakestSubject.percentage}%)</div>
+                                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Needs Focus ({weakestSubject.obtained !== undefined ? `${weakestSubject.obtained}/${weakestSubject.total}` : `${weakestSubject.percentage}%`})</div>
                                 </div>
                             </div>
 
@@ -444,8 +444,11 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                                             </div>
 
                                             {/* Large percentage */}
-                                            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: getGradeColor(result.percentage), marginBottom: '0.5rem' }}>
+                                            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: getGradeColor(result.percentage), marginBottom: '0.2rem' }}>
                                                 {result.percentage}%
+                                            </div>
+                                            <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 600, marginBottom: '0.5rem' }}>
+                                                {result.obtained !== undefined ? `${result.obtained} / ${result.total || 100}` : 'Marks obtained'}
                                             </div>
 
                                             {/* Progress bar */}

@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState } from 'react';
-import { schoolData as initialData } from '../data/schoolData';
+import { schoolData as initialData, CLASSES } from '../data/schoolData';
+
+export { CLASSES };
 
 const SchoolDataContext = createContext();
 

@@ -3,10 +3,10 @@ import {
     Users, Award, Calendar, DollarSign, LogOut,
     Save, CheckCircle, XCircle, Edit3, User,
     Download, Upload, FileText, Search, Camera,
-    BellPlus, Trash2, Megaphone
+    BellPlus, Trash2, Megaphone, PlusCircle, Lock
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { useSchoolData } from '../context/SchoolDataContext';
+import { useSchoolData, CLASSES } from '../context/SchoolDataContext';
 
 const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     const { schoolData, setStudents, setFaculty, updateSchoolInfo, setAnnouncements } = useSchoolData();
@@ -17,6 +17,121 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     const [tempMarks, setTempMarks] = useState([]);
     const [saveMessage, setSaveMessage] = useState('');
     const [reportSearch, setReportSearch] = useState('');
+    const [selectedClass, setSelectedClass] = useState(CLASSES[0]);
+    const [assessmentName, setAssessmentName] = useState('');
+    const [assessmentSubjects, setAssessmentSubjects] = useState([]); // [{ name: 'Math', total: 100 }, ...]
+    const [newSubjectName, setNewSubjectName] = useState('');
+    const [newSubjectTotal, setNewSubjectTotal] = useState(100);
+    const [selectedAssessmentIndex, setSelectedAssessmentIndex] = useState(-1); // -1 for active, others for history
+
+    // Admission Form State
+    const admissionInitialState = {
+        applyingFor: CLASSES[0],
+        applicationDate: new Date().toISOString().split('T')[0],
+        studentName: '',
+        bForm: '',
+        dob: '',
+        nationality: '',
+        gender: '',
+        religion: '',
+        allergies: 'No',
+        allergiesDetails: '',
+        chronicCondition: 'No',
+        chronicConditionDetails: '',
+        medication: 'No',
+        medicationDetails: '',
+        fatherName: '',
+        fatherCnic: '',
+        contact: '',
+        whatsapp: '',
+        address: '',
+        docs: {
+            photos: false,
+            bform: false,
+            cnic: false
+        }
+    };
+    const [admissionData, setAdmissionData] = useState(admissionInitialState);
+
+    const addNewAssessment = () => {
+        if (!assessmentName.trim()) {
+            alert('Please enter an assessment name first.');
+            return;
+        }
+
+        if (assessmentSubjects.length === 0) {
+            alert('Please add at least one subject to the assessment.');
+            return;
+        }
+
+        const updatedStudents = students.map(s => {
+            if (s.grade === selectedClass) {
+                // Archive existing results
+                const historyEntry = {
+                    term: assessmentName,
+                    results: [...s.results]
+                };
+
+                // Create new blank results based on defined subjects
+                const newResults = assessmentSubjects.map(sub => ({
+                    subject: sub.name,
+                    total: sub.total,
+                    obtained: 0,
+                    percentage: 0,
+                    grade: 'F'
+                }));
+
+                return {
+                    ...s,
+                    previousResults: [...(s.previousResults || []), historyEntry],
+                    results: newResults
+                };
+            }
+            return s;
+        });
+
+        setStudents(updatedStudents);
+        showSaveMessage(`Assessment "${assessmentName}" with ${assessmentSubjects.length} subjects archived!`);
+    };
+
+    const addAndDownloadTemplate = () => {
+        if (!assessmentName.trim()) {
+            alert('Please enter an assessment name first.');
+            return;
+        }
+
+        if (assessmentSubjects.length === 0) {
+            alert('Please add at least one subject first.');
+            return;
+        }
+
+        const currentName = assessmentName;
+        const currentSubjects = [...assessmentSubjects];
+
+        addNewAssessment();
+
+        setTimeout(() => {
+            exportMarksExcel(currentName, currentSubjects);
+            setAssessmentName('');
+            setAssessmentSubjects([]);
+        }, 100);
+    };
+
+    const addSubjectToAssessment = () => {
+        if (!newSubjectName.trim()) return;
+        setAssessmentSubjects([...assessmentSubjects, { name: newSubjectName.trim(), total: newSubjectTotal }]);
+        setNewSubjectName('');
+    };
+
+    const removeSubjectFromAssessment = (index) => {
+        setAssessmentSubjects(assessmentSubjects.filter((_, i) => i !== index));
+    };
+
+    const loadAssessment = (index) => {
+        setSelectedAssessmentIndex(index);
+        setEditingMarks(false);
+        setSelectedStudent(null);
+    };
 
     // File refs
     const attendanceFileRef = useRef(null);
@@ -35,6 +150,283 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         setSaveMessage(msg);
         setTimeout(() => setSaveMessage(''), 2500);
     };
+
+    // --- ADMISSION FORM PRINTING ---
+    const printAdmissionForm = () => {
+        const d = admissionData;
+
+        // Helper to create boxed character spans
+        const boxChars = (str, length, spacing = 0) => {
+            const chars = str.replace(/[^A-Z0-9]/gi, '').toUpperCase().split('');
+            let html = '';
+            for (let i = 0; i < length; i++) {
+                html += `<span style="display:inline-block;width:20px;height:20px;border:1px solid #000;text-align:center;line-height:20px;font-weight:700;margin-right:${spacing}px;font-size:11px;">${chars[i] || ''}</span>`;
+            }
+            return html;
+        };
+
+        const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Admission Form - ${d.studentName || 'New Student'}</title>
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+                * { box-sizing: border-box; font-family: 'Inter', sans-serif; }
+                body { margin: 0; padding: 0; background: #f0f0f0; }
+                .page { 
+                    width: 210mm; 
+                    height: 297mm; 
+                    margin: 0 auto; 
+                    background: #fff; 
+                    padding: 15mm 20mm; 
+                    position: relative; 
+                    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                }
+                .header-container {
+                    display: flex;
+                    align-items: center;
+                    border: 2px solid #1e3a8a;
+                    padding: 15px;
+                    border-radius: 8px;
+                    margin-bottom: 20px;
+                    position: relative;
+                    background: linear-gradient(to right, #ffffff, #f0f7ff);
+                }
+                .header-logo {
+                    width: 90px;
+                    height: 90px;
+                    margin-right: 20px;
+                }
+                .header-text {
+                    flex: 1;
+                    text-align: center;
+                }
+                .header-text h1 {
+                    margin: 0;
+                    font-size: 32px;
+                    color: #1e3a8a;
+                    font-weight: 800;
+                    letter-spacing: 1px;
+                    text-transform: uppercase;
+                }
+                .header-text p {
+                    margin: 4px 0;
+                    font-size: 13px;
+                    color: #1e40af;
+                    font-weight: 600;
+                }
+                .header-contact {
+                    font-size: 16px;
+                    font-weight: 800;
+                    color: #1e3a8a;
+                    margin-top: 5px;
+                }
+                .section-title { 
+                    background: #f97316; 
+                    color: #fff; 
+                    display: inline-block; 
+                    padding: 3px 12px; 
+                    font-weight: 800; 
+                    border-radius: 4px; 
+                    margin: 12px 0 8px; 
+                    font-size: 13px; 
+                    text-transform: uppercase;
+                }
+                .field-row { display: flex; align-items: center; margin-bottom: 6px; font-size: 12px; }
+                .field-label { width: 130px; font-weight: 700; font-size: 10px; text-transform: uppercase; color: #334155; }
+                .boxed-row { display: flex; gap: 1px; }
+                .photo-box { 
+                    position: absolute; 
+                    top: 130px; 
+                    right: 20mm; 
+                    width: 32mm; 
+                    height: 40mm; 
+                    border: 2px dashed #64748b; 
+                    display: flex; 
+                    flex-direction: column; 
+                    align-items: center; 
+                    justify-content: center; 
+                    text-align: center; 
+                    padding: 5px;
+                    background: #f8fafc;
+                }
+                .photo-box b { font-size: 12px; color: #64748b; }
+                .photo-box span { font-size: 9px; color: #94a3b8; }
+                .checkbox-group { display: flex; gap: 12px; }
+                .checkbox { display: flex; align-items: center; gap: 4px; font-weight: 600; }
+                .box { width: 13px; height: 13px; border: 1.5px solid #000; }
+                .underline { border-bottom: 1.5px solid #e2e8f0; flex: 1; padding: 0 5px; min-height: 18px; font-weight: 700; color: #1e293b; }
+                .meta-header { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 10px; }
+                
+                @media print {
+                    @page { size: A4; margin: 0; }
+                    body { 
+                        background: #fff; 
+                        padding: 0; 
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                        color-adjust: exact !important;
+                    }
+                    .page { border: none; box-shadow: none; width: 100%; height: 100vh; padding: 10mm 15mm; }
+                    .no-print { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="no-print" style="text-align:center; padding: 20px; background: #fff; border-bottom: 1px solid #ddd;">
+                <button onclick="window.print()" style="padding: 12px 30px; background: #1e3a8a; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 800; font-size: 15px; box-shadow: 0 4px 6px rgba(30,58,138,0.2);">🖨️ PRINT ADMISSION FORM</button>
+            </div>
+            <div class="page">
+                <div class="header-container">
+                    <img src="/src/assets/logo.png" class="header-logo" onerror="this.style.visibility='hidden'" />
+                    <div class="header-text">
+                        <h1>ACS School & College</h1>
+                        <p>Main Jhang Road Near Attock Petrol Pump, Painsra, Faisalabad</p>
+                        <div class="header-contact">📞 0300-1333275</div>
+                    </div>
+                </div>
+
+                <div class="meta-header">
+                    <div>APPLYING FOR: <span style="color:#1e3a8a; border-bottom:1px solid #1e3a8a; min-width:80px; display:inline-block">${d.applyingFor}</span></div>
+                    <div>DATE: <span style="color:#1e3a8a; border-bottom:1px solid #1e3a8a; min-width:80px; display:inline-block">${d.applicationDate}</span></div>
+                </div>
+
+                <div style="text-align:center; margin: 10px 0;">
+                    <span style="background:#1e3a8a; color:#fff; padding:6px 40px; border-radius:6px; font-weight:900; font-size:18px; letter-spacing:1px; border:2px solid #1e3a8a; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">ADMISSION FORM</span>
+                </div>
+
+                <div class="photo-box">
+                    <b>Photograph</b>
+                    <span>(Passport Size)</span>
+                </div>
+
+                <div class="section-title" style="background:#1e3a8a">Student's Information</div>
+                <p style="font-size:9px; color:#64748b; margin:-4px 0 8px; font-weight:600;">USE CAPITAL LETTERS ONLY</p>
+
+                <div class="field-row">
+                    <div class="field-label">Student Name:</div>
+                    <div class="boxed-row">${boxChars(d.studentName, 25)}</div>
+                </div>
+
+                <div class="field-row">
+                    <div class="field-label">B-Form No:</div>
+                    <div class="boxed-row">
+                        ${boxChars(d.bForm.substring(0, 5), 5)}
+                        <span style="margin:0 2px; font-weight:bold;">-</span>
+                        ${boxChars(d.bForm.substring(5, 12), 7)}
+                        <span style="margin:0 2px; font-weight:bold;">-</span>
+                        ${boxChars(d.bForm.substring(12, 13), 1)}
+                    </div>
+                </div>
+
+                <div class="field-row">
+                    <div class="field-label">Date of Birth:</div>
+                    <div class="boxed-row">
+                        ${boxChars(d.dob.split('-')[2] || '', 2)}
+                        <span style="margin:0 2px; font-weight:bold;">-</span>
+                        ${boxChars(d.dob.split('-')[1] || '', 2)}
+                        <span style="margin:0 2px; font-weight:bold;">-</span>
+                        ${boxChars(d.dob.split('-')[0] || '', 4)}
+                    </div>
+                    <div style="margin-left: 15px; font-weight:800; font-size:10px; color:#475569;">NATIONALITY: <span class="underline" style="min-width:100px; display:inline-block">${d.nationality || 'PAKISTANI'}</span></div>
+                </div>
+
+                <div class="field-row" style="margin-top:2px;">
+                    <div class="field-label">Gender:</div>
+                    <div class="checkbox-group">
+                        <div class="checkbox"><div class="box" style="${d.gender === 'Male' ? 'background:#1e3a8a' : ''}"></div> MALE</div>
+                        <div class="checkbox"><div class="box" style="${d.gender === 'Female' ? 'background:#1e3a8a' : ''}"></div> FEMALE</div>
+                    </div>
+                    <div style="margin-left: 30px; font-weight:800; font-size:10px; color:#475569;">RELIGION: <span class="underline" style="min-width:130px; display:inline-block">${d.religion || 'ISLAM'}</span></div>
+                </div>
+
+                <div class="section-title" style="background:#0f766e">Health & Medical Info</div>
+                <div class="field-row">
+                    <div class="field-label" style="width:100px;">Allergies:</div>
+                    <div class="checkbox-group">
+                        <div class="checkbox"><div class="box" style="${d.allergies === 'Yes' ? 'background:#0f766e' : ''}"></div> YES</div>
+                        <div class="checkbox"><div class="box" style="${d.allergies === 'No' ? 'background:#0f766e' : ''}"></div> NO</div>
+                    </div>
+                    <div style="margin-left:20px; font-weight:700; font-size:10px;">DETAILS: <span class="underline">${d.allergiesDetails}</span></div>
+                </div>
+                <div class="field-row">
+                    <div class="field-label" style="width:160px;">Chronic Condition:</div>
+                    <div class="checkbox-group">
+                        <div class="checkbox"><div class="box" style="${d.chronicCondition === 'Yes' ? 'background:#0f766e' : ''}"></div> YES</div>
+                        <div class="checkbox"><div class="box" style="${d.chronicCondition === 'No' ? 'background:#0f766e' : ''}"></div> NO</div>
+                    </div>
+                    <div style="margin-left:20px; font-weight:700; font-size:10px;">DETAILS: <span class="underline">${d.chronicConditionDetails}</span></div>
+                </div>
+                <div class="field-row">
+                    <div class="field-label" style="width:220px;">Regular Medication:</div>
+                    <div class="checkbox-group">
+                        <div class="checkbox"><div class="box" style="${d.medication === 'Yes' ? 'background:#0f766e' : ''}"></div> YES</div>
+                        <div class="checkbox"><div class="box" style="${d.medication === 'No' ? 'background:#0f766e' : ''}"></div> NO</div>
+                    </div>
+                    <div style="margin-left:20px; font-weight:700; font-size:10px; flex:1;">DETAILS: <span class="underline">${d.medicationDetails}</span></div>
+                </div>
+
+                <div class="section-title" style="background:#b91c1c">Parents Information</div>
+                <div class="field-row">
+                    <div class="field-label">Father Name:</div>
+                    <div class="boxed-row">${boxChars(d.fatherName, 25)}</div>
+                </div>
+                <div class="field-row">
+                    <div class="field-label">Father CNIC:</div>
+                    <div class="boxed-row">
+                        ${boxChars(d.fatherCnic.substring(0, 5), 5)}
+                        <span style="margin:0 2px; font-weight:bold;">-</span>
+                        ${boxChars(d.fatherCnic.substring(5, 12), 7)}
+                        <span style="margin:0 2px; font-weight:bold;">-</span>
+                        ${boxChars(d.fatherCnic.substring(12, 13), 1)}
+                    </div>
+                    <div style="margin-left:15px; font-weight:800; font-size:10px; color:#475569;">CONTACT: <span class="underline" style="min-width:130px; display:inline-block">${d.contact}</span></div>
+                </div>
+                <div class="field-row" style="margin-top:5px;">
+                    <div class="field-label">Address:</div>
+                    <span class="underline">${d.address}</span>
+                    <div style="margin-left:15px; font-weight:800; font-size:10px; color:#475569;">WHATSAPP: <span class="underline" style="min-width:120px; display:inline-block">${d.whatsapp}</span></div>
+                </div>
+
+                <div class="section-title" style="background:#1e293b; padding: 3px 20px;">UNDERTAKING</div>
+                <div style="font-size:10px; line-height:1.5; color:#334155; padding: 0 10px;">
+                    <b>I solemnly declare that:</b>
+                    <div style="margin-left:15px;">
+                        • I will abide by all rules and regulations of the school.<br>
+                        • I will pay all dues/fees promptly as per schedule.<br>
+                        • <span style="color:#b91c1c; font-weight:700;">All information provided above is correct and true.</span><br>
+                        • Fees once paid are <span style="font-weight:700;">non-refundable</span> in any situation.<br>
+                        • Admission is provisional until all required documents are submitted.
+                    </div>
+                </div>
+                
+                <div style="display:flex; justify-content:flex-end; margin-top:20px;">
+                    <div style="text-align:center; width:180px; border-top:1.5px solid #1e293b; padding-top:5px; font-size:11px; font-weight:800; color:#1e293b;">PARENT'S SIGNATURE</div>
+                </div>
+
+                <div class="section-title" style="background:#4338ca">Required Documents</div>
+                <div style="display:flex; gap:30px; font-size:10px; font-weight:700; margin-left:10px; color:#4338ca;">
+                    <div class="checkbox"><div class="box" style="${d.docs.photos ? 'background:#4338ca' : ''}"></div> 4 PASSPORT PHOTOS</div>
+                    <div class="checkbox"><div class="box" style="${d.docs.bform ? 'background:#4338ca' : ''}"></div> COPY OF B-FORM</div>
+                    <div class="checkbox"><div class="box" style="${d.docs.cnic ? 'background:#4338ca' : ''}"></div> COPY OF PARENT CNIC</div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; margin-top:15px;">
+                    <div style="text-align:center; width:180px; border-top:1.5px solid #1e293b; padding-top:5px; font-size:11px; font-weight:800; color:#b91c1c;">PRINCIPAL'S SIGNATURE</div>
+                </div>
+
+                <!-- Footer Line -->
+                <div style="position:absolute; bottom:15mm; left:20mm; right:20mm; height:1px; background:#e2e8f0;"></div>
+            </div>
+        </body>
+        </html>`;
+
+        const printWin = window.open('', '_blank');
+        printWin.document.write(html);
+        printWin.document.close();
+    };
+
 
     // --- GRADE HELPER ---
     const percentageToGrade = (num) => {
@@ -89,10 +481,13 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
 
     const handleMarkChange = (index, field, value) => {
         const updated = [...tempMarks];
-        if (field === 'percentage') {
+        if (field === 'percentage' || field === 'obtained') {
             const num = parseInt(value) || 0;
-            updated[index].percentage = Math.min(100, Math.max(0, num));
-            updated[index].grade = percentageToGrade(num);
+            const total = updated[index].total || 100;
+            updated[index].obtained = Math.min(total, Math.max(0, num));
+            const pct = Math.round((updated[index].obtained / total) * 100);
+            updated[index].percentage = pct;
+            updated[index].grade = percentageToGrade(pct);
         }
         setTempMarks(updated);
     };
@@ -110,29 +505,38 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     };
 
     // --- MARKS EXCEL EXPORT ---
-    const exportMarksExcel = () => {
-        const rows = [];
-        students.forEach(student => {
-            student.results.forEach(result => {
-                rows.push({
-                    'Student ID': student.id,
-                    'Student Name': student.name,
-                    'Grade': student.grade,
-                    'Subject': result.subject,
-                    'Percentage': result.percentage,
-                    'Letter Grade': result.grade
-                });
+    const exportMarksExcel = (overrideName = null, overrideSubjects = null) => {
+        const filteredStudents = students.filter(s => s.grade === selectedClass);
+        if (filteredStudents.length === 0) {
+            alert('No students found in this class.');
+            return;
+        }
+
+        const nameToUse = overrideName || assessmentName || 'Assessment';
+        const subjectsList = overrideSubjects || (filteredStudents[0].results.length > 0 ? filteredStudents[0].results.map(r => ({ name: r.subject, total: r.total || 100 })) : []);
+
+        const rows = filteredStudents.map(student => {
+            const row = {
+                'Student ID': student.id,
+                'Student Name': student.name,
+                'Class': student.grade
+            };
+
+            subjectsList.forEach(sub => {
+                const res = student.results.find(r => r.subject === sub.name);
+                row[`${sub.name} (Total: ${sub.total})`] = res ? (res.obtained !== undefined ? res.obtained : res.percentage) : 0;
             });
+
+            return row;
         });
+
         const ws = XLSX.utils.json_to_sheet(rows);
-        ws['!cols'] = [
-            { wch: 12 }, { wch: 25 }, { wch: 10 },
-            { wch: 18 }, { wch: 12 }, { wch: 14 }
-        ];
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Student Marks');
-        XLSX.writeFile(wb, 'Student_Marks.xlsx');
-        showSaveMessage('Marks exported to Excel!');
+        XLSX.utils.book_append_sheet(wb, ws, 'Marks');
+
+        const fileName = `Marks_${selectedClass.replace(/ /g, '_')}_${nameToUse.replace(/ /g, '_')}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        showSaveMessage(`Marks template for ${nameToUse} exported!`);
     };
 
     // --- MARKS EXCEL IMPORT ---
@@ -146,29 +550,63 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                 const ws = wb.Sheets[wb.SheetNames[0]];
                 const data = XLSX.utils.sheet_to_json(ws);
 
+                if (data.length === 0) {
+                    alert('No data found in Excel sheet.');
+                    return;
+                }
+
+                const headers = Object.keys(data[0]);
+                const subjectCols = headers.filter(h => h.includes('(Total:'));
+
+                const subjectsInfo = subjectCols.map(col => {
+                    const match = col.match(/(.*) \(Total: (\d+)\)/);
+                    return {
+                        column: col,
+                        name: match ? match[1].trim() : col,
+                        total: match ? parseInt(match[2]) : 100
+                    };
+                });
+
+                let invalidCount = 0;
                 const updatedStudents = students.map(s => {
-                    const studentRows = data.filter(row => row['Student ID'] === s.id);
-                    if (studentRows.length > 0) {
-                        const updatedResults = s.results.map(result => {
-                            const match = studentRows.find(row => row['Subject'] === result.subject);
-                            if (match && match['Percentage'] !== undefined) {
-                                const pct = Math.min(100, Math.max(0, parseInt(match['Percentage']) || 0));
-                                return {
-                                    ...result,
-                                    percentage: pct,
-                                    grade: percentageToGrade(pct)
-                                };
+                    const excelRow = data.find(row => row['Student ID'] === s.id);
+                    if (excelRow) {
+                        const updatedResults = s.results.map(res => {
+                            const subInfo = subjectsInfo.find(info => info.name === res.subject);
+                            if (subInfo) {
+                                const obtainedValue = excelRow[subInfo.column];
+                                const obtained = parseInt(obtainedValue);
+
+                                if (!isNaN(obtained)) {
+                                    if (obtained > subInfo.total) {
+                                        invalidCount++;
+                                        return res;
+                                    }
+                                    const pct = Math.round((obtained / subInfo.total) * 100);
+                                    return {
+                                        ...res,
+                                        obtained: obtained,
+                                        percentage: pct,
+                                        grade: percentageToGrade(pct)
+                                    };
+                                }
                             }
-                            return result;
+                            return res;
                         });
                         return { ...s, results: updatedResults };
                     }
                     return s;
                 });
+
+                if (invalidCount > 0) {
+                    alert(`Import finished with ${invalidCount} entries skipped because obtained marks exceeded total marks.`);
+                }
+
                 setStudents(updatedStudents);
-                showSaveMessage(`Marks imported for ${data.length} entries!`);
+                showSaveMessage(`Marks imported for ${data.length} students.`);
             } catch (err) {
-                showSaveMessage('Error reading file. Please check the format.');
+                console.error(err);
+                alert('Error processing file. Please ensure it follows the exported template format.');
             }
         };
         reader.readAsBinaryString(file);
@@ -199,22 +637,25 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
 
     // --- ATTENDANCE EXCEL EXPORT ---
     const exportAttendanceExcel = () => {
-        const rows = students.map(s => ({
+        const filteredStudents = students.filter(s => s.grade === selectedClass);
+        const today = new Date().toLocaleDateString();
+        const rows = filteredStudents.map(s => ({
             'Student ID': s.id,
             'Student Name': s.name,
             'Grade': s.grade,
-            'Date': '',
-            'Status (Present/Absent)': ''
+            'Date': today,
+            'Status (Present/Absent)': '',
+            'Instructions': 'Enter P or A in the Status column'
         }));
         const ws = XLSX.utils.json_to_sheet(rows);
         ws['!cols'] = [
             { wch: 12 }, { wch: 25 }, { wch: 10 },
-            { wch: 14 }, { wch: 22 }
+            { wch: 14 }, { wch: 22 }, { wch: 30 }
         ];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
-        XLSX.writeFile(wb, 'Attendance_Sheet.xlsx');
-        showSaveMessage('Attendance sheet exported!');
+        XLSX.writeFile(wb, `Attendance_${selectedClass.replace(/ /g, '_')}_${today.replace(/\//g, '-')}.xlsx`);
+        showSaveMessage(`Attendance for ${selectedClass} exported!`);
     };
 
     // --- ATTENDANCE EXCEL IMPORT ---
@@ -284,20 +725,24 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
 
     // --- FEE EXCEL EXPORT ---
     const exportFeeExcel = () => {
-        const rows = students.map(s => ({
+        const filteredStudents = students.filter(s => s.grade === selectedClass);
+        const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+        const rows = filteredStudents.map(s => ({
             'Student ID': s.id,
             'Student Name': s.name,
             'Grade': s.grade,
-            'Fee Status (Paid/Unpaid)': s.feeStatus === 'paid' ? 'Paid' : 'Unpaid'
+            'Billing Month': currentMonth,
+            'Fee Status (Paid/Unpaid)': s.feeStatus === 'paid' ? 'Paid' : 'Unpaid',
+            'Instructions': 'Change status to Paid or Unpaid'
         }));
         const ws = XLSX.utils.json_to_sheet(rows);
         ws['!cols'] = [
-            { wch: 12 }, { wch: 25 }, { wch: 10 }, { wch: 24 }
+            { wch: 12 }, { wch: 25 }, { wch: 10 }, { wch: 20 }, { wch: 24 }, { wch: 30 }
         ];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Fee Status');
-        XLSX.writeFile(wb, 'Fee_Status.xlsx');
-        showSaveMessage('Fee status exported to Excel!');
+        XLSX.writeFile(wb, `Fees_${selectedClass.replace(/ /g, '_')}_${currentMonth.replace(/ /g, '_')}.xlsx`);
+        showSaveMessage(`Fees for ${selectedClass} exported!`);
     };
 
     // --- FEE EXCEL IMPORT ---
@@ -750,6 +1195,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                             { id: 'attendance', label: 'Attendance Sheet', icon: Calendar },
                             { id: 'fees', label: 'Fee Status', icon: DollarSign },
                             { id: 'reports', label: 'Student Reports', icon: FileText },
+                            { id: 'admissions', label: 'Admissions', icon: PlusCircle },
                             { id: 'announcements', label: 'Announcements', icon: Megaphone }
                         ].map((tab) => (
                             <button
@@ -791,29 +1237,148 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                 }}>
                                     Student Marks
                                 </h2>
-                                <div className="flex gap-2" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                                <div className="flex gap-4" style={{ alignItems: 'center' }}>
+                                    <div className="flex gap-2" style={{ alignItems: 'center' }}>
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-gray-500)' }}>Filter Class:</span>
+                                        <select
+                                            className="form-input"
+                                            style={{ padding: '0.4rem 0.8rem', minWidth: '180px' }}
+                                            value={selectedClass}
+                                            onChange={(e) => {
+                                                setSelectedClass(e.target.value);
+                                                setSelectedStudent(null);
+                                                setEditingMarks(false);
+                                            }}
+                                        >
+                                            {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="flex gap-2" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <button
+                                            onClick={exportMarksExcel}
+                                            style={{
+                                                ...excelBtnStyle,
+                                                background: '#217346',
+                                                color: 'white',
+                                                borderColor: '#217346'
+                                            }}
+                                        >
+                                            <Download size={16} /> Export Excel
+                                        </button>
+                                        <button
+                                            onClick={() => marksFileRef.current.click()}
+                                            style={{
+                                                ...excelBtnStyle,
+                                                background: 'white',
+                                                color: '#217346',
+                                                borderColor: '#217346'
+                                            }}
+                                        >
+                                            <Upload size={16} /> Import Excel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-4" style={{ marginTop: '1rem', background: 'var(--color-gray-50)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-gray-200)' }}>
+                                <div className="flex gap-4 flex-wrap items-center">
+                                    <div className="flex gap-2" style={{ alignItems: 'center' }}>
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Assessment Name:</span>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            style={{ padding: '0.4rem 0.8rem', minWidth: '220px' }}
+                                            placeholder="e.g. Term 1 - 2024"
+                                            value={assessmentName}
+                                            onChange={(e) => setAssessmentName(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex gap-2 items-center" style={{ borderLeft: '1px solid var(--color-gray-200)', paddingLeft: '1rem' }}>
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Add Subject:</span>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            style={{ padding: '0.4rem 0.8rem', width: '150px' }}
+                                            placeholder="Math"
+                                            value={newSubjectName}
+                                            onChange={(e) => setNewSubjectName(e.target.value)}
+                                        />
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Total:</span>
+                                        <input
+                                            type="number"
+                                            className="form-input"
+                                            style={{ padding: '0.4rem 0.8rem', width: '80px' }}
+                                            value={newSubjectTotal}
+                                            onChange={(e) => setNewSubjectTotal(parseInt(e.target.value) || 0)}
+                                        />
+                                        <button
+                                            onClick={addSubjectToAssessment}
+                                            className="btn btn-secondary btn-sm"
+                                            style={{ height: '36px', padding: '0 1rem' }}
+                                        >
+                                            Add Subject
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Subject List */}
+                                {assessmentSubjects.length > 0 && (
+                                    <div className="flex gap-2 flex-wrap" style={{ marginTop: '0.5rem' }}>
+                                        {assessmentSubjects.map((sub, idx) => (
+                                            <div key={idx} style={{
+                                                background: 'white',
+                                                border: '1px solid var(--color-gray-300)',
+                                                borderRadius: '999px',
+                                                padding: '0.2rem 0.8rem',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.5rem',
+                                                fontSize: '0.85rem'
+                                            }}>
+                                                <span style={{ fontWeight: 700 }}>{sub.name}</span>
+                                                <span style={{ color: 'var(--color-gray-500)', fontSize: '0.75rem' }}>({sub.total} Marks)</span>
+                                                <button
+                                                    onClick={() => removeSubjectFromAssessment(idx)}
+                                                    style={{ color: 'var(--color-danger)', cursor: 'pointer', padding: '0 2px' }}
+                                                >
+                                                    <XCircle size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div className="flex gap-3" style={{ marginTop: '0.5rem', borderTop: '1px solid var(--color-gray-200)', paddingTop: '1rem' }}>
                                     <button
-                                        onClick={exportMarksExcel}
-                                        style={{
-                                            ...excelBtnStyle,
-                                            background: '#217346',
-                                            color: 'white',
-                                            borderColor: '#217346'
-                                        }}
+                                        onClick={addNewAssessment}
+                                        className="btn btn-secondary"
+                                        style={{ flex: 1, padding: '0.6rem' }}
                                     >
-                                        <Download size={16} /> Export Excel
+                                        <Save size={18} /> Archive Current Results
                                     </button>
                                     <button
-                                        onClick={() => marksFileRef.current.click()}
-                                        style={{
-                                            ...excelBtnStyle,
-                                            background: 'white',
-                                            color: '#217346',
-                                            borderColor: '#217346'
-                                        }}
+                                        onClick={addAndDownloadTemplate}
+                                        className="btn btn-primary"
+                                        style={{ flex: 2, padding: '0.6rem' }}
                                     >
-                                        <Upload size={16} /> Import Excel
+                                        <Download size={18} /> Create Assessment & Download Excel Template
                                     </button>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem', borderBottom: '1px solid var(--color-gray-200)', paddingBottom: '1.5rem' }}>
+                                <div className="flex gap-2" style={{ alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-primary)' }}>View Session:</span>
+                                    <select
+                                        className="form-input"
+                                        style={{ padding: '0.4rem 0.8rem', minWidth: '180px', borderColor: 'var(--color-primary)' }}
+                                        value={selectedAssessmentIndex}
+                                        onChange={(e) => loadAssessment(parseInt(e.target.value))}
+                                    >
+                                        <option value="-1">Current Active Session</option>
+                                        {students.find(s => s.grade === selectedClass)?.previousResults?.map((res, idx) => (
+                                            <option key={idx} value={idx}>{res.term}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 
@@ -828,9 +1393,9 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                     style={{ minWidth: '220px' }}
                                 >
                                     <option value="">Select Student...</option>
-                                    {students.map(s => (
+                                    {students.filter(s => s.grade === selectedClass).map(s => (
                                         <option key={s.id} value={s.id}>
-                                            {s.name} ({s.id}) — {s.grade}
+                                            {s.name} ({s.id})
                                         </option>
                                     ))}
                                 </select>
@@ -864,19 +1429,32 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                         width: '60px', height: '60px', borderRadius: '50%', overflow: 'hidden',
                                         background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center'
                                     }}>
-                                        {students.find(s => s.id === selectedStudent).photo ? (
-                                            <img
-                                                src={students.find(s => s.id === selectedStudent).photo}
-                                                alt="Student"
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                            />
+                                        {selectedAssessmentIndex === -1 ? (
+                                            students.find(s => s.id === selectedStudent).photo ? (
+                                                <img
+                                                    src={students.find(s => s.id === selectedStudent).photo}
+                                                    alt="Student"
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                />
+                                            ) : (
+                                                <User size={30} color="#94a3b8" />
+                                            )
                                         ) : (
-                                            <User size={30} color="#94a3b8" />
+                                            <Award size={30} color="var(--color-primary)" />
                                         )}
                                     </div>
                                     <div>
-                                        <div style={{ fontWeight: 'bold' }}>{students.find(s => s.id === selectedStudent).name}</div>
-                                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Current Photo</div>
+                                        <div style={{ fontWeight: 'bold' }}>
+                                            {students.find(s => s.id === selectedStudent).name}
+                                            {selectedAssessmentIndex !== -1 && (
+                                                <span style={{ marginLeft: '1rem', padding: '2px 8px', background: 'var(--color-primary-50)', color: 'var(--color-primary)', borderRadius: '12px', fontSize: '0.75rem' }}>
+                                                    Historical: {students.find(s => s.id === selectedStudent).previousResults[selectedAssessmentIndex].term}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                            {selectedAssessmentIndex === -1 ? 'Current Session' : 'Locked History'}
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -892,6 +1470,11 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                 </div>
                             ) : (
                                 <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                                    {selectedAssessmentIndex !== -1 && (
+                                        <div style={{ padding: '1rem', background: '#fef9c3', borderBottom: '1px solid #fef08a', color: '#854d0e', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <Lock size={16} /> Viewing historical data. Archive sessions to save current work.
+                                        </div>
+                                    )}
                                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                         <thead>
                                             <tr style={{ background: 'var(--color-gray-50)' }}>
@@ -899,7 +1482,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                                     Subject
                                                 </th>
                                                 <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-gray-900)' }}>
-                                                    Percentage
+                                                    Obtained
                                                 </th>
                                                 <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-gray-900)' }}>
                                                     Grade
@@ -907,7 +1490,10 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {(editingMarks ? tempMarks : students.find(s => s.id === selectedStudent).results).map((result, idx) => (
+                                            {(selectedAssessmentIndex === -1
+                                                ? (editingMarks ? tempMarks : students.find(s => s.id === selectedStudent).results)
+                                                : students.find(s => s.id === selectedStudent).previousResults[selectedAssessmentIndex].results
+                                            ).map((result, idx) => (
                                                 <tr key={idx} style={{ borderTop: '1px solid var(--color-gray-200)' }}>
                                                     <td style={{ padding: '1rem', fontWeight: 'var(--font-weight-medium)' }}>
                                                         {result.subject}
@@ -917,15 +1503,15 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                                             <input
                                                                 type="number"
                                                                 min="0"
-                                                                max="100"
-                                                                value={result.percentage}
-                                                                onChange={(e) => handleMarkChange(idx, 'percentage', e.target.value)}
+                                                                max={result.total || 100}
+                                                                value={result.obtained !== undefined ? result.obtained : result.percentage}
+                                                                onChange={(e) => handleMarkChange(idx, 'obtained', e.target.value)}
                                                                 className="form-input"
                                                                 style={{ width: '80px', padding: '0.4rem', textAlign: 'center' }}
                                                             />
                                                         ) : (
                                                             <span style={{ fontWeight: 'var(--font-weight-bold)', color: getGradeColor(result.percentage) }}>
-                                                                {result.percentage}%
+                                                                {result.obtained !== undefined ? result.obtained : result.percentage} / {result.total || 100} ({result.percentage}%)
                                                             </span>
                                                         )}
                                                     </td>
@@ -958,13 +1544,26 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                         <div className="animate-fade-in">
                             <div className="flex-between" style={{ marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                                 <h2 style={{ fontSize: '1.75rem', fontWeight: 'var(--font-weight-bold)' }}>Attendance Sheet</h2>
-                                <div className="flex gap-2" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                                    <button onClick={exportAttendanceExcel} style={{ ...excelBtnStyle, background: '#217346', color: 'white', borderColor: '#217346' }}>
-                                        <Download size={16} /> Export Excel
-                                    </button>
-                                    <button onClick={() => attendanceFileRef.current.click()} style={{ ...excelBtnStyle, background: 'white', color: '#217346', borderColor: '#217346' }}>
-                                        <Upload size={16} /> Import Excel
-                                    </button>
+                                <div className="flex gap-4" style={{ alignItems: 'center' }}>
+                                    <div className="flex gap-2" style={{ alignItems: 'center' }}>
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-gray-500)' }}>Filter Class:</span>
+                                        <select
+                                            className="form-input"
+                                            style={{ padding: '0.4rem 0.8rem', minWidth: '180px' }}
+                                            value={selectedClass}
+                                            onChange={(e) => setSelectedClass(e.target.value)}
+                                        >
+                                            {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="flex gap-2" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <button onClick={exportAttendanceExcel} style={{ ...excelBtnStyle, background: '#217346', color: 'white', borderColor: '#217346' }}>
+                                            <Download size={16} /> Export Excel
+                                        </button>
+                                        <button onClick={() => attendanceFileRef.current.click()} style={{ ...excelBtnStyle, background: 'white', color: '#217346', borderColor: '#217346' }}>
+                                            <Upload size={16} /> Import Excel
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <div className="card" style={{ padding: 0, overflow: 'hidden', overflowX: 'auto' }}>
@@ -978,7 +1577,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {students.map((student) => (
+                                        {students.filter(s => s.grade === selectedClass).map((student) => (
                                             <tr key={student.id} style={{ borderTop: '1px solid var(--color-gray-200)' }}>
                                                 <td style={{ padding: '1rem', color: 'var(--color-gray-600)' }}>{student.id}</td>
                                                 <td style={{ padding: '1rem', fontWeight: 'var(--font-weight-medium)' }}>{student.name}</td>
@@ -1012,13 +1611,26 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                         <div className="animate-fade-in">
                             <div className="flex-between" style={{ marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                                 <h2 style={{ fontSize: '1.75rem', fontWeight: 'var(--font-weight-bold)' }}>Fee Status</h2>
-                                <div className="flex gap-2" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                                    <button onClick={exportFeeExcel} style={{ ...excelBtnStyle, background: '#217346', color: 'white', borderColor: '#217346' }}>
-                                        <Download size={16} /> Export Excel
-                                    </button>
-                                    <button onClick={() => feeFileRef.current.click()} style={{ ...excelBtnStyle, background: 'white', color: '#217346', borderColor: '#217346' }}>
-                                        <Upload size={16} /> Import Excel
-                                    </button>
+                                <div className="flex gap-4" style={{ alignItems: 'center' }}>
+                                    <div className="flex gap-2" style={{ alignItems: 'center' }}>
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-gray-500)' }}>Filter Class:</span>
+                                        <select
+                                            className="form-input"
+                                            style={{ padding: '0.4rem 0.8rem', minWidth: '180px' }}
+                                            value={selectedClass}
+                                            onChange={(e) => setSelectedClass(e.target.value)}
+                                        >
+                                            {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="flex gap-2" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <button onClick={exportFeeExcel} style={{ ...excelBtnStyle, background: '#217346', color: 'white', borderColor: '#217346' }}>
+                                            <Download size={16} /> Export Excel
+                                        </button>
+                                        <button onClick={() => feeFileRef.current.click()} style={{ ...excelBtnStyle, background: 'white', color: '#217346', borderColor: '#217346' }}>
+                                            <Upload size={16} /> Import Excel
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <div className="card" style={{ padding: 0, overflow: 'hidden', overflowX: 'auto' }}>
@@ -1033,7 +1645,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {students.map((student) => (
+                                        {students.filter(s => s.grade === selectedClass).map((student) => (
                                             <tr key={student.id} style={{ borderTop: '1px solid var(--color-gray-200)' }}>
                                                 <td style={{ padding: '1rem', color: 'var(--color-gray-600)' }}>{student.id}</td>
                                                 <td style={{ padding: '1rem', fontWeight: 'var(--font-weight-medium)' }}>{student.name}</td>
@@ -1062,10 +1674,262 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                         </div>
                     )}
 
+                    {activeTab === 'admissions' && (
+                        <div className="animate-fade-in">
+                            <div className="flex-between" style={{ marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                                <h2 style={{ fontSize: '1.75rem', fontWeight: 'var(--font-weight-bold)' }}>Admission Form</h2>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setAdmissionData(admissionInitialState)}
+                                        className="btn"
+                                        style={{ background: 'white', border: '1px solid var(--color-gray-300)', color: 'var(--color-gray-600)' }}
+                                    >
+                                        <Trash2 size={16} /> Reset Form
+                                    </button>
+                                    <button
+                                        onClick={printAdmissionForm}
+                                        className="btn btn-primary"
+                                        style={{ background: '#4d7c0f', borderColor: '#4d7c0f' }}
+                                    >
+                                        <FileText size={18} /> Print Admission Form
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="card" style={{ padding: '2rem' }}>
+                                {/* Top Meta Info */}
+                                <div className="grid grid-cols-2" style={{ gap: '2rem', marginBottom: '2rem', borderBottom: '1px solid var(--color-gray-100)', paddingBottom: '1.5rem' }}>
+                                    <div>
+                                        <label className="form-label">Applying For (class)</label>
+                                        <select
+                                            className="form-input"
+                                            value={admissionData.applyingFor}
+                                            onChange={(e) => setAdmissionData({ ...admissionData, applyingFor: e.target.value })}
+                                        >
+                                            {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="form-label">Application Date</label>
+                                        <input
+                                            type="date"
+                                            className="form-input"
+                                            value={admissionData.applicationDate}
+                                            onChange={(e) => setAdmissionData({ ...admissionData, applicationDate: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Student Information */}
+                                <div style={{ marginBottom: '2.5rem' }}>
+                                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.25rem', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <User size={18} /> Student's Information
+                                    </h3>
+                                    <div className="grid grid-cols-2" style={{ gap: '1.5rem' }}>
+                                        <div>
+                                            <label className="form-label">Student's Name (Capital Letters)</label>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                placeholder="Enter full name"
+                                                value={admissionData.studentName}
+                                                onChange={(e) => setAdmissionData({ ...admissionData, studentName: e.target.value.toUpperCase() })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="form-label">B-Form Number</label>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                placeholder="35202-0000000-0"
+                                                value={admissionData.bForm}
+                                                onChange={(e) => setAdmissionData({ ...admissionData, bForm: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="form-label">Date of Birth</label>
+                                            <input
+                                                type="date"
+                                                className="form-input"
+                                                value={admissionData.dob}
+                                                onChange={(e) => setAdmissionData({ ...admissionData, dob: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="form-label">Nationality</label>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                placeholder="e.g. Pakistani"
+                                                value={admissionData.nationality}
+                                                onChange={(e) => setAdmissionData({ ...admissionData, nationality: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="form-label">Gender</label>
+                                            <div className="flex gap-4">
+                                                {['Male', 'Female', 'Others'].map(g => (
+                                                    <label key={g} className="flex gap-2" style={{ alignItems: 'center', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="radio"
+                                                            name="gender"
+                                                            checked={admissionData.gender === g}
+                                                            onChange={() => setAdmissionData({ ...admissionData, gender: g })}
+                                                        /> {g}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="form-label">Religion</label>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                placeholder="e.g. Islam"
+                                                value={admissionData.religion}
+                                                onChange={(e) => setAdmissionData({ ...admissionData, religion: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Health & Medical */}
+                                <div style={{ marginBottom: '2.5rem' }}>
+                                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.25rem', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <Award size={18} /> Health & Medical Information
+                                    </h3>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                        <div className="grid grid-cols-2" style={{ gap: '2rem' }}>
+                                            <div>
+                                                <label className="form-label">Any Allergies?</label>
+                                                <div className="flex gap-4">
+                                                    {['Yes', 'No'].map(o => (
+                                                        <label key={o} className="flex gap-2" style={{ alignItems: 'center', cursor: 'pointer' }}>
+                                                            <input type="radio" checked={admissionData.allergies === o} onChange={() => setAdmissionData({ ...admissionData, allergies: o })} /> {o}
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="form-label">Allergy Details (If any)</label>
+                                                <input type="text" className="form-input" value={admissionData.allergiesDetails} onChange={(e) => setAdmissionData({ ...admissionData, allergiesDetails: e.target.value })} />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2" style={{ gap: '2rem' }}>
+                                            <div>
+                                                <label className="form-label">Chronic Medical Condition?</label>
+                                                <div className="flex gap-4">
+                                                    {['Yes', 'No'].map(o => (
+                                                        <label key={o} className="flex gap-2" style={{ alignItems: 'center', cursor: 'pointer' }}>
+                                                            <input type="radio" checked={admissionData.chronicCondition === o} onChange={() => setAdmissionData({ ...admissionData, chronicCondition: o })} /> {o}
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="form-label">Condition Details (If any)</label>
+                                                <input type="text" className="form-input" value={admissionData.chronicConditionDetails} onChange={(e) => setAdmissionData({ ...admissionData, chronicConditionDetails: e.target.value })} />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2" style={{ gap: '2rem' }}>
+                                            <div>
+                                                <label className="form-label">Take Regular Medication?</label>
+                                                <div className="flex gap-4">
+                                                    {['Yes', 'No'].map(o => (
+                                                        <label key={o} className="flex gap-2" style={{ alignItems: 'center', cursor: 'pointer' }}>
+                                                            <input type="radio" checked={admissionData.medication === o} onChange={() => setAdmissionData({ ...admissionData, medication: o })} /> {o}
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="form-label">Medication Details (If any)</label>
+                                                <input type="text" className="form-input" value={admissionData.medicationDetails} onChange={(e) => setAdmissionData({ ...admissionData, medicationDetails: e.target.value })} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Parent Information */}
+                                <div style={{ marginBottom: '2.5rem' }}>
+                                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.25rem', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <Users size={18} /> Parents Information
+                                    </h3>
+                                    <div className="grid grid-cols-2" style={{ gap: '1.5rem' }}>
+                                        <div className="col-span-2">
+                                            <label className="form-label">Father's Name (Capital Letters)</label>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                value={admissionData.fatherName}
+                                                onChange={(e) => setAdmissionData({ ...admissionData, fatherName: e.target.value.toUpperCase() })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="form-label">CNIC Number</label>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                placeholder="35202-0000000-0"
+                                                value={admissionData.fatherCnic}
+                                                onChange={(e) => setAdmissionData({ ...admissionData, fatherCnic: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="form-label">Contact Number</label>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                value={admissionData.contact}
+                                                onChange={(e) => setAdmissionData({ ...admissionData, contact: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="form-label">WhatsApp Number</label>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                value={admissionData.whatsapp}
+                                                onChange={(e) => setAdmissionData({ ...admissionData, whatsapp: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="form-label">Home Address</label>
+                                            <textarea
+                                                className="form-input"
+                                                style={{ height: '80px' }}
+                                                value={admissionData.address}
+                                                onChange={(e) => setAdmissionData({ ...admissionData, address: e.target.value })}
+                                            ></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Documents Required */}
+                                <div>
+                                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.25rem', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <CheckCircle size={18} /> Documents Required
+                                    </h3>
+                                    <div className="flex flex-col gap-3">
+                                        <label className="flex gap-2" style={{ alignItems: 'center', cursor: 'pointer' }}>
+                                            <input type="checkbox" checked={admissionData.docs.photos} onChange={(e) => setAdmissionData({ ...admissionData, docs: { ...admissionData.docs, photos: e.target.checked } })} /> 4 Passport size photographs
+                                        </label>
+                                        <label className="flex gap-2" style={{ alignItems: 'center', cursor: 'pointer' }}>
+                                            <input type="checkbox" checked={admissionData.docs.bform} onChange={(e) => setAdmissionData({ ...admissionData, docs: { ...admissionData.docs, bform: e.target.checked } })} /> A Copy of B-Form
+                                        </label>
+                                        <label className="flex gap-2" style={{ alignItems: 'center', cursor: 'pointer' }}>
+                                            <input type="checkbox" checked={admissionData.docs.cnic} onChange={(e) => setAdmissionData({ ...admissionData, docs: { ...admissionData.docs, cnic: e.target.checked } })} /> A Copy of CNIC of Parents/Guardian
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'reports' && (
                         <div className="animate-fade-in">
                             <h2 style={{ fontSize: '1.75rem', fontWeight: 'var(--font-weight-bold)', marginBottom: '1.5rem' }}>Student Reports</h2>
-                            < div style={{ maxWidth: '500px', margin: '0 auto', textAlign: 'center' }}>
+                            <div style={{ maxWidth: '500px', margin: '0 auto', textAlign: 'center' }}>
                                 <div className="card" style={{ padding: '2rem' }}>
                                     <div style={{ marginBottom: '1.5rem' }}>
                                         <label className="form-label" style={{ textAlign: 'left' }}>Search Student</label>
@@ -1214,8 +2078,8 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                     )}
 
                 </div>
-            </section>
-        </div>
+            </section >
+        </div >
     );
 };
 
