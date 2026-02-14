@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowRight, Users, Globe, Award, TrendingUp, BookOpen, Heart, ChevronDown, Star, Sparkles, GraduationCap, Trophy } from 'lucide-react';
+import { ArrowRight, Users, Globe, Award, TrendingUp, BookOpen, Heart, ChevronDown, Star, Sparkles, GraduationCap, Trophy, Megaphone } from 'lucide-react';
 import { useSchoolData } from '../context/SchoolDataContext';
 
 // ── Scroll reveal hook ──
@@ -408,6 +408,100 @@ const Home = ({ setCurrentPage }) => {
                     ))}
                 </div>
             </div>
+
+            {/* ═══════ ANNOUNCEMENTS SECTION ═══════ */}
+            {schoolData.announcements && schoolData.announcements.length > 0 && (
+                <section className="section bg-white" style={{ padding: '4rem 0' }}>
+                    <div className="container">
+                        <Reveal>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', justifyContent: 'center' }}>
+                                <Megaphone size={24} color="#2563eb" />
+                                <p style={{
+                                    color: 'var(--color-primary)',
+                                    fontWeight: 700,
+                                    fontSize: '0.9rem',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '3px',
+                                    margin: 0
+                                }}>Stay Updated</p>
+                            </div>
+                            <h2 style={{
+                                textAlign: 'center',
+                                fontSize: 'clamp(1.75rem, 3.5vw, 2.5rem)',
+                                fontWeight: 'var(--font-weight-bold)',
+                                color: 'var(--color-gray-900)',
+                                marginBottom: '2.5rem'
+                            }}>Latest Announcements</h2>
+                        </Reveal>
+
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                            gap: '1.5rem'
+                        }}>
+                            {schoolData.announcements.slice(0, 3).map((ann, idx) => (
+                                <Reveal key={ann.id} delay={idx * 0.1} direction="up">
+                                    <div className="card" style={{
+                                        height: '100%',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        border: '1px solid #f1f5f9',
+                                        padding: '1.75rem',
+                                        transition: 'all 0.3s ease',
+                                        background: 'linear-gradient(to bottom right, #ffffff, #f8fafc)'
+                                    }}>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.75rem',
+                                            marginBottom: '1rem'
+                                        }}>
+                                            <div style={{
+                                                padding: '4px 12px',
+                                                background: '#eff6ff',
+                                                color: '#2563eb',
+                                                borderRadius: '6px',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 700
+                                            }}>
+                                                {ann.date}
+                                            </div>
+                                            <div style={{
+                                                width: '6px',
+                                                height: '6px',
+                                                borderRadius: '50%',
+                                                background: '#2563eb',
+                                                boxShadow: '0 0 8px #2563eb'
+                                            }} />
+                                        </div>
+                                        <h3 style={{
+                                            fontSize: '1.2rem',
+                                            fontWeight: 700,
+                                            color: '#1e3a8a',
+                                            marginBottom: '0.75rem',
+                                            lineHeight: 1.4
+                                        }}>{ann.title}</h3>
+                                        <p style={{
+                                            color: '#475569',
+                                            fontSize: '0.95rem',
+                                            lineHeight: 1.6,
+                                            flex: 1
+                                        }}>{ann.content}</p>
+                                    </div>
+                                </Reveal>
+                            ))}
+                        </div>
+
+                        {schoolData.announcements.length > 3 && (
+                            <Reveal delay={0.4} style={{ textAlign: 'center', marginTop: '2.5rem' }}>
+                                <p style={{ color: '#64748b', fontSize: '0.9rem', fontStyle: 'italic' }}>
+                                    + {schoolData.announcements.length - 3} more announcements in the notice board.
+                                </p>
+                            </Reveal>
+                        )}
+                    </div>
+                </section>
+            )}
 
             {/* ═══════ STATISTICS ═══════ */}
             <section className="section bg-white" style={{ position: 'relative', overflow: 'hidden' }}>

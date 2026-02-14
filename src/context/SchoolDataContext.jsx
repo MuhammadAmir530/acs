@@ -45,6 +45,10 @@ export const SchoolDataProvider = ({ children }) => {
         setData(prev => ({ ...prev, students: studentsList }));
     };
 
+    const setAnnouncements = (announcementsList) => {
+        setData(prev => ({ ...prev, announcements: announcementsList }));
+    };
+
     return (
         <SchoolDataContext.Provider value={{
             schoolData: data,
@@ -53,7 +57,8 @@ export const SchoolDataProvider = ({ children }) => {
             updateContact,
             setFaculty,
             setFacilities,
-            setStudents
+            setStudents,
+            setAnnouncements
         }}>
             {children}
         </SchoolDataContext.Provider>
