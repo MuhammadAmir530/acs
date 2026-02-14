@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
-import { Send, MapPin, Phone, Mail, Clock, CheckCircle } from 'lucide-react';
+import { Send, MapPin, Phone, Mail, Clock, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import { useSchoolData } from '../context/SchoolDataContext';
+import emailjs from '@emailjs/browser';
+
+// ── EmailJS Configuration ──
+// Sign up at https://www.emailjs.com and fill in these values:
+const EMAILJS_SERVICE_ID = 'service_acs2025';   // Your EmailJS service ID
+const EMAILJS_TEMPLATE_ID = 'template_contact'; // Your EmailJS template ID
+const EMAILJS_PUBLIC_KEY = 'YOUR_PUBLIC_KEY';    // Your EmailJS public key
 
 const Contact = () => {
     const { schoolData } = useSchoolData();
@@ -12,15 +19,40 @@ const Contact = () => {
         message: ''
     });
     const [submitted, setSubmitted] = useState(false);
+    const [sending, setSending] = useState(false);
+    const [error, setError] = useState('');
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        // Simulate form submission
-        setSubmitted(true);
-        setTimeout(() => {
-            setSubmitted(false);
-            setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
-        }, 3000);
+        setSending(true);
+        setError('');
+
+        try {
+            await emailjs.send(
+                EMAILJS_SERVICE_ID,
+                EMAILJS_TEMPLATE_ID,
+                {
+                    from_name: formData.name,
+                    from_email: formData.email,
+                    phone: formData.phone || 'Not provided',
+                    subject: formData.subject,
+                    message: formData.message,
+                    to_name: schoolData.name || 'ACS Higher Secondary School'
+                },
+                EMAILJS_PUBLIC_KEY
+            );
+
+            setSubmitted(true);
+            setTimeout(() => {
+                setSubmitted(false);
+                setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
+            }, 4000);
+        } catch (err) {
+            console.error('EmailJS Error:', err);
+            setError('Failed to send message. Please try again or email us directly.');
+        } finally {
+            setSending(false);
+        }
     };
 
     const handleChange = (e) => {
@@ -158,9 +190,40 @@ const Contact = () => {
                                         />
                                     </div>
 
-                                    <button type="submit" className="btn btn-primary btn-lg" style={{ width: '100%' }}>
-                                        <Send size={20} />
-                                        Send Message
+                                    {error && (
+                                        <div style={{
+                                            display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                            padding: '0.75rem 1rem', marginBottom: '1rem',
+                                            background: '#fef2f2', color: '#dc2626',
+                                            borderRadius: '10px', fontSize: '0.9rem', fontWeight: 600,
+                                            border: '1px solid #fecaca'
+                                        }}>
+                                            <AlertCircle size={18} />
+                                            {error}
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="submit"
+                                        className="btn btn-primary btn-lg"
+                                        style={{
+                                            width: '100%',
+                                            opacity: sending ? 0.7 : 1,
+                                            pointerEvents: sending ? 'none' : 'auto'
+                                        }}
+                                        disabled={sending}
+                                    >
+                                        {sending ? (
+                                            <>
+                                                <Loader size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                                                Sending...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Send size={20} />
+                                                Send Message
+                                            </>
+                                        )}
                                     </button>
                                 </form>
                             )}
