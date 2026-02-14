@@ -9,14 +9,15 @@ import Facilities from './pages/Facilities';
 import Contact from './pages/Contact';
 import Login from './pages/Login';
 import StudentPortal from './pages/StudentPortal';
-import AdminPanel from './pages/AdminPanel';
-import TeacherPortal from './pages/TeacherPortal';
+import AdminPortal from './pages/AdminPortal';
+import DeveloperPanel from './pages/DeveloperPanel';
+import Blog from './pages/Blog';
 
 function App() {
     const [currentPage, setCurrentPage] = useState('home');
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
-    const [isTeacher, setIsTeacher] = useState(false);
+    const [isDeveloper, setIsDeveloper] = useState(false);
     const [loggedInStudent, setLoggedInStudent] = useState(null);
 
     const renderPage = () => {
@@ -26,17 +27,19 @@ function App() {
             case 'about':
                 return <About />;
             case 'faculty':
-                return <Faculty isAdmin={isAdmin} />;
+                return <Faculty isDeveloper={isDeveloper} />;
             case 'facilities':
                 return <Facilities />;
             case 'contact':
                 return <Contact />;
+            case 'blog':
+                return <Blog />;
             case 'login':
                 return (
                     <Login
                         setIsLoggedIn={setIsLoggedIn}
                         setIsAdmin={setIsAdmin}
-                        setIsTeacher={setIsTeacher}
+                        setIsDeveloper={setIsDeveloper}
                         setCurrentPage={setCurrentPage}
                         setLoggedInStudent={setLoggedInStudent}
                     />
@@ -52,15 +55,15 @@ function App() {
                 );
             case 'admin':
                 return (
-                    <AdminPanel
+                    <AdminPortal
                         setIsAdmin={setIsAdmin}
                         setCurrentPage={setCurrentPage}
                     />
                 );
-            case 'teacher':
+            case 'developer':
                 return (
-                    <TeacherPortal
-                        setIsTeacher={setIsTeacher}
+                    <DeveloperPanel
+                        setIsDeveloper={setIsDeveloper}
                         setCurrentPage={setCurrentPage}
                     />
                 );
@@ -77,7 +80,7 @@ function App() {
                     setCurrentPage={setCurrentPage}
                     isLoggedIn={isLoggedIn}
                     isAdmin={isAdmin}
-                    isTeacher={isTeacher}
+                    isDeveloper={isDeveloper}
                 />
                 <main style={{ flex: 1 }}>
                     {renderPage()}

@@ -4,8 +4,10 @@ import {
     LogOut, TrendingUp, DollarSign, CheckCircle, XCircle,
     ArrowUp, ArrowDown, Minus, BookMarked
 } from 'lucide-react';
+import { useSchoolData } from '../context/SchoolDataContext';
 
 const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStudent }) => {
+    const { schoolData } = useSchoolData();
     const [activeTab, setActiveTab] = useState('overview');
     const [selectedPrevTerm, setSelectedPrevTerm] = useState(0);
 
@@ -17,7 +19,8 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
 
     if (!student) return null;
 
-    // Use live data from studentsData if available (updated by teacher), otherwise use the student prop
+    // Use live data from context if available (updated by teacher), otherwise use the student prop
+    const studentsData = schoolData?.students;
     const liveStudent = studentsData ? studentsData.find(s => s.id === student.id) || student : student;
 
     // Calculate grade average

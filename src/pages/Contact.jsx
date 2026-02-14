@@ -37,7 +37,7 @@ const Contact = () => {
                     phone: formData.phone || 'Not provided',
                     subject: formData.subject,
                     message: formData.message,
-                    to_name: schoolData.name || 'ACS Higher Secondary School'
+                    to_name: schoolData.name || 'ACS School & College'
                 },
                 EMAILJS_PUBLIC_KEY
             );
@@ -363,7 +363,7 @@ const Contact = () => {
                     style={{ border: 0 }}
                     allowFullScreen=""
                     loading="lazy"
-                    title="ACS Higher Secondary School - 8RXP+GXF, Jhang Rd, Faisalabad"
+                    title="ACS School & College - 8RXP+GXF, Jhang Rd, Faisalabad"
                 />
             </section>
         </div>

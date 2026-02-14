@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useSchoolData } from '../context/SchoolDataContext';
 
-const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
+const DeveloperPanel = ({ setIsDeveloper, setCurrentPage }) => {
     const { schoolData, updateSchoolInfo, updateAbout, updateContact, setFaculty: setContextFaculty, setFacilities: setContextFacilities } = useSchoolData();
 
     const [activeSection, setActiveSection] = useState('dashboard');
@@ -17,12 +17,12 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
 
     // School info state - initialized from context
     const [schoolInfo, setSchoolInfo] = useState({
-        name: schoolData.name || 'ACS Higher Secondary School',
+        name: schoolData.name || 'ACS School & College',
         tagline: schoolData.tagline || 'Ready to Lead. Ready to Inspire.',
         description: schoolData.description || 'A world-class education that empowers students to reach their full potential.',
         phone: schoolData.contact?.phone || '0300 1333275',
         email: schoolData.contact?.email || 'Infoacspainsra@gmail.com',
-        address: schoolData.contact?.address || 'ACS Higher Secondary School, Jhang Road Painsra, Pakistan',
+        address: schoolData.contact?.address || 'ACS School & College, Jhang Road Painsra, Pakistan',
         mission: schoolData.about?.mission || '',
         vision: schoolData.about?.vision || ''
     });
@@ -36,7 +36,7 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
     const students = schoolData.students || [];
 
     const handleLogout = () => {
-        setIsAdmin(false);
+        setIsDeveloper(false);
         setCurrentPage('home');
     };
 
@@ -125,7 +125,7 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
                                     marginBottom: '0.2rem',
                                     letterSpacing: '-0.02em'
                                 }}>
-                                    Admin Dashboard
+                                    Developer Dashboard
                                 </h1>
                                 <p style={{ opacity: 0.8, fontSize: '0.95rem' }}>Manage school data, faculty, and facilities</p>
                             </div>
@@ -798,30 +798,33 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
                                             { page: 'Facilities Page', desc: 'Campus infrastructure and resources', status: 'Published', color: '#10b981' },
                                             { page: 'Contact Page', desc: 'Contact form, address, and map', status: 'Published', color: '#10b981' },
                                             { page: 'Student Portal', desc: 'Results, attendance, and fee status for students', status: 'Active', color: '#3b82f6' },
-                                            { page: 'Teacher Portal', desc: 'Marks, attendance, fee management with Excel support', status: 'Active', color: '#3b82f6' }
-                                        ].map((item, idx) => (
-                                            <div key={idx} style={{
-                                                ...cardStyle,
-                                                display: 'flex', justifyContent: 'space-between',
-                                                alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem'
-                                            }}>
-                                                <div>
-                                                    <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#1e293b' }}>{item.page}</div>
-                                                    <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>{item.desc}</div>
+                                            { page: 'Admin Portal', desc: 'Teacher access for marks and attendance', status: 'Restricted', color: '#f59e0b' },
+                                            { page: 'Developer Panel', desc: 'Full school data management', status: 'Restricted', color: '#7c3aed' }
+                                        ].map((p, idx) => (
+                                            <div key={idx} style={cardStyle}>
+                                                <div style={{ display: 'flex', justifySelf: 'between', alignItems: 'center' }}>
+                                                    <div>
+                                                        <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1e293b' }}>{p.page}</h3>
+                                                        <p style={{ fontSize: '0.9rem', color: '#64748b', marginTop: '0.2rem' }}>{p.desc}</p>
+                                                    </div>
+                                                    <span style={{
+                                                        marginLeft: 'auto',
+                                                        padding: '0.3rem 0.8rem',
+                                                        borderRadius: '999px',
+                                                        fontSize: '0.8rem',
+                                                        fontWeight: 700,
+                                                        background: p.status === 'Published' ? '#ecfdf5' : p.status === 'Active' ? '#eff6ff' : '#fef3c7',
+                                                        color: p.status === 'Published' ? '#059669' : p.status === 'Active' ? '#2563eb' : '#d97706'
+                                                    }}>
+                                                        {p.status}
+                                                    </span>
                                                 </div>
-                                                <span style={{
-                                                    padding: '0.25rem 0.8rem', borderRadius: '999px',
-                                                    fontSize: '0.8rem', fontWeight: 700,
-                                                    background: item.color + '15',
-                                                    color: item.color
-                                                }}>
-                                                    {item.status}
-                                                </span>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                             )}
+
                         </div>
                     </div>
                 </div>
@@ -830,4 +833,4 @@ const AdminPanel = ({ setIsAdmin, setCurrentPage }) => {
     );
 };
 
-export default AdminPanel;
+export default DeveloperPanel;

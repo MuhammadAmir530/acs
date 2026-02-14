@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { LogIn, User, Lock, AlertCircle } from 'lucide-react';
-import { adminCredentials, teacherCredentials } from '../data/schoolData';
+import { adminCredentials, developerCredentials } from '../data/schoolData';
 import { useSchoolData } from '../context/SchoolDataContext';
 
-const Login = ({ setIsLoggedIn, setIsAdmin, setIsTeacher, setCurrentPage, setLoggedInStudent }) => {
+const Login = ({ setIsLoggedIn, setIsAdmin, setIsDeveloper, setCurrentPage, setLoggedInStudent }) => {
     const { schoolData } = useSchoolData();
-    const [loginType, setLoginType] = useState('student'); // 'student', 'teacher', or 'admin'
+    const [loginType, setLoginType] = useState('student'); // 'student', 'admin', or 'developer'
     const [credentials, setCredentials] = useState({
         username: '',
         password: ''
@@ -16,21 +16,21 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setIsTeacher, setCurrentPage, setLog
         e.preventDefault();
         setError('');
 
-        if (loginType === 'admin') {
+        if (loginType === 'developer') {
+            if (credentials.username === developerCredentials.username &&
+                credentials.password === developerCredentials.password) {
+                setIsDeveloper(true);
+                setCurrentPage('developer');
+            } else {
+                setError('Invalid developer credentials');
+            }
+        } else if (loginType === 'admin') {
             if (credentials.username === adminCredentials.username &&
                 credentials.password === adminCredentials.password) {
                 setIsAdmin(true);
                 setCurrentPage('admin');
             } else {
                 setError('Invalid admin credentials');
-            }
-        } else if (loginType === 'teacher') {
-            if (credentials.username === teacherCredentials.username &&
-                credentials.password === teacherCredentials.password) {
-                setIsTeacher(true);
-                setCurrentPage('teacher');
-            } else {
-                setError('Invalid teacher credentials');
             }
         } else {
             const student = schoolData.students.find(
@@ -57,8 +57,8 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setIsTeacher, setCurrentPage, setLog
 
     const loginTypes = [
         { id: 'student', label: 'Student' },
-        { id: 'teacher', label: 'Teacher' },
-        { id: 'admin', label: 'Admin' }
+        { id: 'admin', label: 'Admin' },
+        { id: 'developer', label: 'Developer' }
     ];
 
     return (
@@ -105,7 +105,7 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setIsTeacher, setCurrentPage, setLog
                     color: 'var(--color-gray-600)',
                     marginBottom: '2rem'
                 }}>
-                    Access your student, teacher, or admin portal
+                    Access your student, admin, or developer portal
                 </p>
 
                 {/* Login Type Toggle - 3 way */}
@@ -139,7 +139,7 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setIsTeacher, setCurrentPage, setLog
                 <form onSubmit={handleSubmit}>
                     <div style={{ marginBottom: '1.25rem' }}>
                         <label className="form-label">
-                            {loginType === 'student' ? 'Student ID' : loginType === 'teacher' ? 'Username' : 'Username'}
+                            {loginType === 'student' ? 'Student ID' : 'Username'}
                         </label>
                         <div style={{ position: 'relative' }}>
                             <User
@@ -160,7 +160,7 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setIsTeacher, setCurrentPage, setLog
                                 className="form-input"
                                 style={{ paddingLeft: '3rem' }}
                                 required
-                                placeholder={loginType === 'student' ? 'STU001' : loginType === 'teacher' ? 'teacher' : 'admin'}
+                                placeholder={loginType === 'student' ? 'STU001' : loginType === 'admin' ? 'admin' : 'developer'}
                                 autoComplete="username"
                             />
                         </div>
@@ -239,10 +239,10 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setIsTeacher, setCurrentPage, setLog
                         <strong>Student:</strong> STU001 / demo123
                     </div>
                     <div style={{ marginBottom: '0.5rem' }}>
-                        <strong>Teacher:</strong> teacher / teacher123
+                        <strong>Admin:</strong> admin / admin123
                     </div>
                     <div>
-                        <strong>Admin:</strong> admin / admin123
+                        <strong>Developer:</strong> developer / dev123
                     </div>
                 </div>
             </div>

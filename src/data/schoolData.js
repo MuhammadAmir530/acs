@@ -1,7 +1,7 @@
 export const schoolData = {
-    name: "ACS Higher Secondary School",
-    tagline: "Ready to Lead.  Ready to Inspire.",
-    description: "A world-class education that empowers students to reach their full potential.",
+    name: "ACS School & College",
+    tagline: "Inspiring Excellence, Empowering Leaders.",
+    description: "A premier educational institution dedicated to academic achievement and holistic development.",
 
     contact: {
         phone: "0300 1333275",
@@ -11,8 +11,8 @@ export const schoolData = {
     },
 
     about: {
-        mission: "At ACS Higher Secondary School, our mission is to shape confident, principled, and forward-thinking individuals who excel not only in academics but in life. We are dedicated to providing a comprehensive, well-structured education rooted in academic rigor, moral integrity, and critical inquiry. Within a safe, disciplined, and nurturing environment, we empower students to think independently, act responsibly, and lead with compassion. By embracing modern teaching practices, leveraging technology as a learning tool, and promoting active, experiential engagement, we prepare our students to succeed beyond the classroom—as lifelong learners, ethical citizens, and change-makers ready to meet the challenges of an ever-evolving world.",
-        vision: "Our vision is to establish ACS Higher Secondary School as a transformative force in education—renowned for uncompromising academic excellence, pioneering innovation, and the holistic empowerment of every student. We aspire to cultivate a generation of ethical, dynamic leaders who are not only knowledgeable and skilled but deeply principled and adaptable to the demands of a rapidly changing world. By embracing the power of modern technology, including AI-enhanced learning, while steadfastly upholding values of respect, discipline, integrity, and lifelong growth, we are shaping a future where education transcends boundaries and where every student becomes a catalyst for positive change..",
+        mission: "At ACS School & College, our mission is to shape confident, principled, and forward-thinking individuals who excel not only in academics but in life. We are dedicated to providing a comprehensive, well-structured education rooted in academic rigor, moral integrity, and critical inquiry. Within a safe, disciplined, and nurturing environment, we empower students to think independently, act responsibly, and lead with compassion. By embracing modern teaching practices, leveraging technology as a learning tool, and promoting active, experiential engagement, we prepare our students to succeed beyond the classroom—as lifelong learners, ethical citizens, and change-makers ready to meet the challenges of an ever-evolving world.",
+        vision: "Our vision is to establish ACS School & College as a transformative force in education—renowned for uncompromising academic excellence, pioneering innovation, and the holistic empowerment of every student. We aspire to cultivate a generation of ethical, dynamic leaders who are not only knowledgeable and skilled but deeply principled and adaptable to the demands of a rapidly changing world. By embracing the power of modern technology, including AI-enhanced learning, while steadfastly upholding values of respect, discipline, integrity, and lifelong growth, we are shaping a future where education transcends boundaries and where every student becomes a catalyst for positive change..",
         values: [
             "Excellence in Education",
             "Integrity and Respect",
@@ -29,9 +29,9 @@ export const schoolData = {
     },
 
     statistics: [
-        { value: "0+", label: "Students" },
-        { value: "0+", label: "Alumni" },
-        { value: "0", label: "Expert Staff" },
+        { value: "1000+", label: "Students" },
+        { value: "200+", label: "Alumni" },
+        { value: "40+", label: "Expert Staff" },
         { value: "100%", label: "University Acceptance" }
     ],
 
@@ -328,14 +328,14 @@ export const schoolData = {
     ]
 };
 
-// Admin credentials
+// Admin credentials (manages students, marks, attendance)
 export const adminCredentials = {
     username: "admin",
     password: "admin123"
 };
 
-// Teacher credentials
-export const teacherCredentials = {
-    username: "teacher",
-    password: "teacher123"
+// Developer credentials (manages school info, faculty, facilities)
+export const developerCredentials = {
+    username: "developer",
+    password: "dev123"
 };

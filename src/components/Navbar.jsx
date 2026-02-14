@@ -1,178 +1,182 @@
 import React, { useState } from 'react';
 import { Menu, X, School, LogIn } from 'lucide-react';
+import { useSchoolData } from '../context/SchoolDataContext';
 
-const Navbar = ({ currentPage, setCurrentPage, isLoggedIn, isAdmin, isTeacher }) => {
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+const Navbar = ({ currentPage, setCurrentPage, isLoggedIn, isAdmin, isDeveloper }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const { schoolData } = useSchoolData(); // Get school name/logo from context
 
     const navItems = [
         { id: 'home', label: 'Home' },
-        { id: 'about', label: 'About Us' },
+        { id: 'about', label: 'About' },
         { id: 'faculty', label: 'Faculty' },
         { id: 'facilities', label: 'Facilities' },
-        { id: 'contact', label: 'Contact Us' }
+        { id: 'blog', label: 'Blog' },
+        { id: 'contact', label: 'Contact' }
     ];
 
-    const handleNavClick = (page) => {
-        setCurrentPage(page);
-        setIsMobileMenuOpen(false);
-    };
-
     return (
-        <nav className="bg-white shadow-md sticky top-0 z-50">
-            <div className="container">
-                <div className="flex-between" style={{ height: '80px' }}>
-                    {/* Logo */}
-                    <div
-                        className="flex gap-2"
-                        style={{ cursor: 'pointer', alignItems: 'center' }}
-                        onClick={() => handleNavClick('home')}
-                    >
-                        <div className="flex-center" style={{
-                            width: '48px',
-                            height: '48px',
-                            background: 'var(--gradient-primary)',
-                            borderRadius: '50%',
-                            color: 'white'
-                        }}>
-                            <School size={28} />
-                        </div>
-                        <span style={{
-                            fontSize: '1.25rem',
-                            fontWeight: 'var(--font-weight-bold)',
-                            color: 'var(--color-gray-900)',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px'
-                        }}>
-                            ACS School
-                        </span>
-                    </div>
-
-                    {/* Desktop Menu */}
-                    <div className="flex gap-3" style={{
-                        display: 'none',
-                        alignItems: 'center'
-                    }} id="desktop-menu">
-                        {navItems.map((item) => (
-                            <button
-                                key={item.id}
-                                onClick={() => handleNavClick(item.id)}
-                                style={{
-                                    padding: '0.5rem 1rem',
-                                    fontWeight: 'var(--font-weight-semibold)',
-                                    color: currentPage === item.id ? 'var(--color-primary)' : 'var(--color-gray-600)',
-                                    transition: 'color var(--transition-base)',
-                                    position: 'relative'
-                                }}
-                                onMouseEnter={(e) => e.target.style.color = 'var(--color-primary)'}
-                                onMouseLeave={(e) => {
-                                    if (currentPage !== item.id) e.target.style.color = 'var(--color-gray-600)';
-                                }}
-                            >
-                                {item.label}
-                                {currentPage === item.id && (
-                                    <div style={{
-                                        position: 'absolute',
-                                        bottom: '-4px',
-                                        left: '50%',
-                                        transform: 'translateX(-50%)',
-                                        width: '30px',
-                                        height: '3px',
-                                        background: 'var(--gradient-primary)',
-                                        borderRadius: '2px'
-                                    }} />
-                                )}
-                            </button>
-                        ))}
-
-                        <button
-                            onClick={() => handleNavClick(
-                                isLoggedIn ? 'portal' : isAdmin ? 'admin' : isTeacher ? 'teacher' : 'login'
-                            )}
-                            className="btn btn-primary btn-sm"
-                            style={{ marginLeft: '0.5rem' }}
-                        >
-                            <LogIn size={18} />
-                            {isLoggedIn ? 'Student Portal' : isAdmin ? 'Admin Panel' : isTeacher ? 'Teacher Portal' : 'Login'}
-                        </button>
-                    </div>
-
-                    {/* Mobile Menu Button */}
-                    <button
-                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                        style={{
+        <nav style={{
+            background: 'linear-gradient(90deg, #0f172a 0%, #1e3a5f 100%)',
+            color: 'white',
+            position: 'sticky',
+            top: 0,
+            zIndex: 1000,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+        }}>
+            <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '80px' }}>
+                {/* Logo & Name */}
+                <div
+                    onClick={() => setCurrentPage('home')}
+                    style={{ display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }}
+                >
+                    <div style={{
+                        width: '50px',
+                        height: '50px',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden'
+                    }}>
+                        <img
+                            src="/src/assets/logo.png"
+                            alt="ACS Logo"
+                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                            onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'flex';
+                            }}
+                        />
+                        <div style={{
                             display: 'none',
-                            padding: '0.5rem',
-                            color: 'var(--color-primary)'
+                            width: '100%',
+                            height: '100%',
+                            background: 'linear-gradient(135deg, #fbbf24, #d97706)',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            <span style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>🎓</span>
+                        </div>
+                    </div>
+                    <div style={{ lineHeight: 1.2 }}>
+                        <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>ACS</h1>
+                        <span style={{ fontSize: '0.75rem', opacity: 0.8, fontWeight: 300, letterSpacing: '1px' }}>SCHOOL & COLLEGE</span>
+                    </div>
+                </div>
+
+                {/* Desktop Menu */}
+                <div className="hidden md:flex" style={{ gap: '2rem', alignItems: 'center' }}>
+                    {navItems.map((item) => (
+                        <button
+                            key={item.id}
+                            onClick={() => setCurrentPage(item.id)}
+                            className="nav-link"
+                            style={{
+                                color: currentPage === item.id ? '#fbbf24' : 'rgba(255,255,255,0.8)',
+                                fontWeight: currentPage === item.id ? 600 : 400,
+                                position: 'relative',
+                                transition: 'all 0.3s ease'
+                            }}
+                        >
+                            {item.label}
+                            {currentPage === item.id && (
+                                <span style={{
+                                    position: 'absolute',
+                                    bottom: '-6px',
+                                    left: 0,
+                                    width: '100%',
+                                    height: '2px',
+                                    background: '#fbbf24',
+                                    borderRadius: '2px',
+                                    boxShadow: '0 0 8px #fbbf24'
+                                }} />
+                            )}
+                        </button>
+                    ))}
+
+                    <button
+                        onClick={() => setCurrentPage(isLoggedIn ? 'portal' : isAdmin ? 'admin' : isDeveloper ? 'developer' : 'login')}
+                        className="btn btn-primary"
+                        style={{
+                            padding: '0.6rem 1.5rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            borderRadius: '50px',
+                            fontWeight: 600
                         }}
-                        id="mobile-menu-btn"
                     >
-                        {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+                        {isLoggedIn ? <div style={{ width: '8px', height: '8px', background: '#4ade80', borderRadius: '50%' }} /> : <LogIn size={18} />}
+                        {isLoggedIn ? 'Student Portal' : isAdmin ? 'Admin Portal' : isDeveloper ? 'Developer Panel' : 'Login'}
                     </button>
                 </div>
+
+                {/* Mobile Menu Button */}
+                <button
+                    className="md:hidden"
+                    onClick={() => setIsOpen(!isOpen)}
+                    style={{ color: 'white' }}
+                >
+                    {isOpen ? <X size={28} /> : <Menu size={28} />}
+                </button>
             </div>
 
-            {/* Mobile Menu */}
-            {isMobileMenuOpen && (
-                <div
-                    className="bg-white animate-fade-in"
-                    style={{
-                        display: 'none',
-                        borderTop: '1px solid var(--color-gray-200)',
-                        padding: '1rem 0'
-                    }}
-                    id="mobile-menu"
-                >
-                    <div className="container flex-col gap-1">
+            {/* Mobile Menu Dropdown */}
+            {isOpen && (
+                <div className="md:hidden animate-fade-in" style={{
+                    position: 'absolute',
+                    top: '80px',
+                    left: 0,
+                    width: '100%',
+                    background: '#1e3a5f',
+                    borderTop: '1px solid rgba(255,255,255,0.1)',
+                    padding: '1rem'
+                }}>
+                    <div className="flex flex-col gap-2">
                         {navItems.map((item) => (
                             <button
                                 key={item.id}
-                                onClick={() => handleNavClick(item.id)}
+                                onClick={() => {
+                                    setCurrentPage(item.id);
+                                    setIsOpen(false);
+                                }}
                                 style={{
-                                    width: '100%',
-                                    padding: '0.75rem 1rem',
+                                    padding: '1rem',
                                     textAlign: 'left',
-                                    fontWeight: 'var(--font-weight-semibold)',
-                                    color: currentPage === item.id ? 'var(--color-primary)' : 'var(--color-gray-700)',
-                                    background: currentPage === item.id ? 'var(--color-gray-50)' : 'transparent',
-                                    borderRadius: 'var(--radius-md)',
-                                    transition: 'all var(--transition-base)'
+                                    borderRadius: '8px',
+                                    background: currentPage === item.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                    color: currentPage === item.id ? '#fbbf24' : 'white',
+                                    fontWeight: currentPage === item.id ? 600 : 400
                                 }}
                             >
                                 {item.label}
                             </button>
                         ))}
-
+                        <div style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '0.5rem 0' }} />
                         <button
-                            onClick={() => handleNavClick(
-                                isLoggedIn ? 'portal' : isAdmin ? 'admin' : isTeacher ? 'teacher' : 'login'
-                            )}
-                            className="btn btn-primary"
-                            style={{ width: '100%', marginTop: '0.5rem' }}
+                            onClick={() => {
+                                setCurrentPage(isLoggedIn ? 'portal' : isAdmin ? 'admin' : isDeveloper ? 'developer' : 'login');
+                                setIsOpen(false);
+                            }}
+                            style={{
+                                padding: '1rem',
+                                textAlign: 'left',
+                                borderRadius: '8px',
+                                background: 'rgba(37,99,235,0.2)',
+                                color: '#60a5fa',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                            }}
                         >
                             <LogIn size={18} />
-                            {isLoggedIn ? 'Student Portal' : isAdmin ? 'Admin Panel' : isTeacher ? 'Teacher Portal' : 'Login'}
+                            {isLoggedIn ? 'Student Portal' : isAdmin ? 'Admin Portal' : isDeveloper ? 'Developer Panel' : 'Login'}
                         </button>
                     </div>
                 </div>
             )}
-
-            <style jsx>{`
-        @media (min-width: 769px) {
-          #desktop-menu {
-            display: flex !important;
-          }
-        }
-        
-        @media (max-width: 768px) {
-          #mobile-menu-btn {
-            display: block !important;
-          }
-          
-          #mobile-menu {
-            display: block !important;
-          }
-        }
-      `}</style>
         </nav>
     );
 };
