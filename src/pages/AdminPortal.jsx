@@ -3,13 +3,15 @@ import {
     Users, Award, Calendar, DollarSign, LogOut,
     Save, CheckCircle, XCircle, Edit3, User,
     Download, Upload, FileText, Search, Camera,
-    BellPlus, Trash2, Megaphone, PlusCircle, Lock
+    BellPlus, Trash2, Megaphone, PlusCircle, Lock,
+    Building, School, Check, X, ChevronRight, Layout
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { useSchoolData, CLASSES } from '../context/SchoolDataContext';
+import { useSchoolData } from '../context/SchoolDataContext';
+import { supabase } from '../supabaseClient';
 
 const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
-    const { schoolData, setStudents, setFaculty, updateSchoolInfo, setAnnouncements } = useSchoolData();
+    const { schoolData, CLASSES, fetchData, setStudents, setFaculty, updateSchoolInfo, setAnnouncements } = useSchoolData();
     const [activeTab, setActiveTab] = useState('marks');
     const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', date: new Date().toISOString().split('T')[0] });
     const [selectedStudent, setSelectedStudent] = useState(null);
@@ -138,17 +140,94 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     const marksFileRef = useRef(null);
     const feeFileRef = useRef(null);
     const photoFileRef = useRef(null);
+    const facultyFileRef = useRef(null);
+    const facilityFileRef = useRef(null);
+
+    const [editingFacultyId, setEditingFacultyId] = useState(null);
+    const [editingFacilityId, setEditingFacilityId] = useState(null);
+    const [tempFacultyMember, setTempFacultyMember] = useState(null);
+    const [tempFacility, setTempFacility] = useState(null);
 
     const students = schoolData.students || [];
 
-    const handleLogout = () => {
+    const handleFacultyPhotoUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const publicUrl = await uploadImage(file, 'Faculty');
+        if (publicUrl) {
+            if (editingFacultyId === 'new') {
+                setTempFacultyMember(prev => ({ ...prev, image: publicUrl }));
+            } else {
+                const { error } = await supabase.from('faculty').update({ image: publicUrl }).eq('id', editingFacultyId);
+                if (error) {
+                    alert('Error updating database: ' + error.message);
+                } else {
+                    // Update state FIRST so UI doesn't revert while fetching
+                    setTempFacultyMember(prev => ({ ...prev, image: publicUrl }));
+                    await fetchData();
+                    showSaveMessage('Faculty photo updated!');
+                }
+            }
+        }
+    };
+
+    const handleFacilityPhotoUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const publicUrl = await uploadImage(file, 'Facilities');
+        if (publicUrl) {
+            if (editingFacilityId === 'new') {
+                setTempFacility(prev => ({ ...prev, image: publicUrl }));
+            } else {
+                const { error } = await supabase.from('facilities').update({ image: publicUrl }).eq('id', editingFacilityId);
+                if (error) {
+                    alert('Error updating database: ' + error.message);
+                } else {
+                    // Update state FIRST so UI doesn't revert while fetching
+                    setTempFacility(prev => ({ ...prev, image: publicUrl }));
+                    await fetchData();
+                    showSaveMessage('Facility photo updated!');
+                }
+            }
+        }
+    };
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
         setIsAdmin(false);
         setCurrentPage('home');
     };
 
     const showSaveMessage = (msg) => {
         setSaveMessage(msg);
-        setTimeout(() => setSaveMessage(''), 2500);
+        setTimeout(() => setSaveMessage(''), 3000);
+    };
+
+    // --- PHOTO UPLOAD TO SUPABASE STORAGE ---
+    const uploadImage = async (file, bucket) => {
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            let { error: uploadError } = await supabase.storage
+                .from(bucket)
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage
+                .from(bucket)
+                .getPublicUrl(filePath);
+
+            return data.publicUrl;
+        } catch (error) {
+            console.error('Error uploading image:', error.message);
+            alert('Error uploading image: ' + error.message);
+            return null;
+        }
     };
 
     // --- ADMISSION FORM PRINTING ---
@@ -442,7 +521,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     };
 
     // --- PHOTO UPLOAD FUNCTION ---
-    const handlePhotoUpload = (e) => {
+    const handlePhotoUpload = async (e) => {
         const file = e.target.files[0];
         if (!file || !selectedStudent) return;
 
@@ -452,22 +531,20 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
             return;
         }
 
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-            const photoUrl = evt.target.result; // Base64 string
+        const publicUrl = await uploadImage(file, 'Student');
+        if (publicUrl) {
+            const { error } = await supabase
+                .from('students')
+                .update({ image: publicUrl }) // Update 'image' column in DB
+                .eq('id', selectedStudent);
 
-            // Update student data
-            const updatedStudents = students.map(s => {
-                if (s.id === selectedStudent) {
-                    return { ...s, photo: photoUrl };
-                }
-                return s;
-            });
-
-            setStudents(updatedStudents);
-            showSaveMessage('Student photo updated!');
-        };
-        reader.readAsDataURL(file);
+            if (error) {
+                alert('Error updating student: ' + error.message);
+            } else {
+                await fetchData();
+                showSaveMessage('Student photo updated!');
+            }
+        }
         e.target.value = ''; // Reset input
     };
 
@@ -492,16 +569,20 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         setTempMarks(updated);
     };
 
-    const saveMarks = () => {
-        const updatedStudents = students.map(s => {
-            if (s.id === selectedStudent) {
-                return { ...s, results: [...tempMarks] };
-            }
-            return s;
-        });
-        setStudents(updatedStudents);
-        setEditingMarks(false);
-        showSaveMessage('Marks saved successfully!');
+    const saveMarks = async () => {
+        const student = students.find(s => s.id === selectedStudent);
+        if (!student) return;
+
+        const { error } = await supabase
+            .from('students')
+            .update({ results: [...tempMarks] })
+            .eq('id', selectedStudent);
+
+        if (!error) {
+            fetchData();
+            setEditingMarks(false);
+            showSaveMessage('Marks saved successfully!');
+        }
     };
 
     // --- MARKS EXCEL EXPORT ---
@@ -614,25 +695,30 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     };
 
     // --- ATTENDANCE FUNCTIONS ---
-    const markAttendance = (studentId, status) => {
-        const updatedStudents = students.map(s => {
-            if (s.id === studentId) {
-                const newAttendance = { ...s.attendance };
-                newAttendance.total += 1;
-                if (status === 'present') {
-                    newAttendance.present += 1;
-                } else {
-                    newAttendance.absent += 1;
-                }
-                newAttendance.percentage = parseFloat(
-                    ((newAttendance.present / newAttendance.total) * 100).toFixed(1)
-                );
-                return { ...s, attendance: newAttendance };
-            }
-            return s;
-        });
-        setStudents(updatedStudents);
-        showSaveMessage(`Attendance marked for ${students.find(s => s.id === studentId).name}!`);
+    const markAttendance = async (studentId, status) => {
+        const student = students.find(s => s.id === studentId);
+        if (!student) return;
+
+        const newAttendance = { ...student.attendance };
+        newAttendance.total += 1;
+        if (status === 'present') {
+            newAttendance.present += 1;
+        } else {
+            newAttendance.absent += 1;
+        }
+        newAttendance.percentage = parseFloat(
+            ((newAttendance.present / newAttendance.total) * 100).toFixed(1)
+        );
+
+        const { error } = await supabase
+            .from('students')
+            .update({ attendance: newAttendance })
+            .eq('id', studentId);
+
+        if (!error) {
+            fetchData();
+            showSaveMessage(`Attendance marked for ${student.name}!`);
+        }
     };
 
     // --- ATTENDANCE EXCEL EXPORT ---
@@ -707,20 +793,20 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     };
 
     // --- FEE FUNCTIONS ---
-    const toggleFeeStatus = (studentId) => {
-        const updatedStudents = students.map(s => {
-            if (s.id === studentId) {
-                return {
-                    ...s,
-                    feeStatus: s.feeStatus === 'paid' ? 'unpaid' : 'paid'
-                };
-            }
-            return s;
-        });
-        setStudents(updatedStudents);
+    const toggleFeeStatus = async (studentId) => {
         const student = students.find(s => s.id === studentId);
-        const newStatus = student.feeStatus === 'paid' ? 'Unpaid' : 'Paid';
-        showSaveMessage(`Fee status updated to ${newStatus} for ${student.name}!`);
+        if (!student) return;
+
+        const newStatus = student.feeStatus === 'paid' ? 'unpaid' : 'paid';
+        const { error } = await supabase
+            .from('students')
+            .update({ fee_status: newStatus })
+            .eq('id', studentId);
+
+        if (!error) {
+            fetchData();
+            showSaveMessage(`Fee status updated to ${newStatus.toUpperCase()} for ${student.name}!`);
+        }
     };
 
     // --- FEE EXCEL EXPORT ---
@@ -1055,24 +1141,125 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     };
 
     // --- ANNOUNCEMENTS FUNCTIONS ---
-    const addAnnouncement = () => {
+    const addAnnouncement = async () => {
         if (!newAnnouncement.title || !newAnnouncement.content) {
             showSaveMessage('Title and content are required!');
             return;
         }
-        const updatedAnnouncements = [
-            { id: Date.now(), ...newAnnouncement },
-            ...(schoolData.announcements || [])
-        ];
-        setAnnouncements(updatedAnnouncements);
-        setNewAnnouncement({ title: '', content: '', date: new Date().toISOString().split('T')[0] });
-        showSaveMessage('Announcement posted!');
+
+        const { error } = await supabase.from('announcements').insert([newAnnouncement]);
+        if (error) {
+            alert('Error posting announcement: ' + error.message);
+        } else {
+            setNewAnnouncement({ title: '', content: '', date: new Date().toISOString().split('T')[0] });
+            await fetchData();
+            showSaveMessage('Announcement posted!');
+        }
     };
 
-    const deleteAnnouncement = (id) => {
-        const updatedAnnouncements = schoolData.announcements.filter(a => a.id !== id);
-        setAnnouncements(updatedAnnouncements);
-        showSaveMessage('Announcement deleted!');
+    const deleteAnnouncement = async (id) => {
+        if (window.confirm('Are you sure you want to delete this announcement?')) {
+            const { error } = await supabase.from('announcements').delete().eq('id', id);
+            if (error) {
+                alert('Error deleting announcement: ' + error.message);
+            } else {
+                await fetchData();
+                showSaveMessage('Announcement deleted!');
+            }
+        }
+    };
+
+    // --- FACULTY MANAGEMENT ---
+    const addFaculty = () => {
+        setEditingFacultyId('new');
+        setTempFacultyMember({
+            name: '',
+            role: '',
+            department: '',
+            bio: '',
+            image: ''
+        });
+    };
+
+    const saveFaculty = async () => {
+        if (editingFacultyId === 'new') {
+            const { error } = await supabase.from('faculty').insert([tempFacultyMember]);
+            if (error) {
+                alert('Error adding faculty: ' + error.message);
+                return;
+            }
+            showSaveMessage('Faculty member added!');
+        } else {
+            // Strip ID from payload for updates
+            const { id, ...payload } = tempFacultyMember;
+            const { error } = await supabase.from('faculty').update(payload).eq('id', editingFacultyId);
+            if (error) {
+                alert('Error updating faculty: ' + error.message);
+                return;
+            }
+            showSaveMessage('Faculty updated!');
+        }
+        setEditingFacultyId(null);
+        setTempFacultyMember(null);
+        await fetchData();
+    };
+
+    const deleteFaculty = async (id) => {
+        if (window.confirm('Are you sure you want to remove this faculty member?')) {
+            const { error } = await supabase.from('faculty').delete().eq('id', id);
+            if (error) {
+                alert('Error deleting faculty: ' + error.message);
+            } else {
+                await fetchData();
+                showSaveMessage('Faculty member removed');
+            }
+        }
+    };
+
+    // --- FACILITIES MANAGEMENT ---
+    const addFacility = () => {
+        setEditingFacilityId('new');
+        setTempFacility({
+            name: '',
+            description: '',
+            category: '',
+            image: ''
+        });
+    };
+
+    const saveFacility = async () => {
+        if (editingFacilityId === 'new') {
+            const { error } = await supabase.from('facilities').insert([tempFacility]);
+            if (error) {
+                alert('Error adding facility: ' + error.message);
+                return;
+            }
+            showSaveMessage('Facility added!');
+        } else {
+            // Strip ID from payload for updates
+            const { id, ...payload } = tempFacility;
+            const { error } = await supabase.from('facilities').update(payload).eq('id', editingFacilityId);
+            if (error) {
+                alert('Error updating facility: ' + error.message);
+                return;
+            }
+            showSaveMessage('Facility updated!');
+        }
+        setEditingFacilityId(null);
+        setTempFacility(null);
+        await fetchData();
+    };
+
+    const deleteFacility = async (id) => {
+        if (window.confirm('Are you sure you want to remove this facility?')) {
+            const { error } = await supabase.from('facilities').delete().eq('id', id);
+            if (error) {
+                alert('Error deleting facility: ' + error.message);
+            } else {
+                await fetchData();
+                showSaveMessage('Facility removed');
+            }
+        }
     };
 
     // Common button style for Excel buttons
@@ -1118,6 +1305,20 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                 type="file"
                 ref={photoFileRef}
                 onChange={handlePhotoUpload}
+                accept="image/*"
+                style={{ display: 'none' }}
+            />
+            <input
+                type="file"
+                ref={facultyFileRef}
+                onChange={(e) => handleFacultyPhotoUpload(e)}
+                accept="image/*"
+                style={{ display: 'none' }}
+            />
+            <input
+                type="file"
+                ref={facilityFileRef}
+                onChange={(e) => handleFacilityPhotoUpload(e)}
                 accept="image/*"
                 style={{ display: 'none' }}
             />
@@ -1194,6 +1395,8 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                             { id: 'marks', label: 'Student Marks', icon: Award },
                             { id: 'attendance', label: 'Attendance Sheet', icon: Calendar },
                             { id: 'fees', label: 'Fee Status', icon: DollarSign },
+                            { id: 'faculty', label: 'Faculty', icon: Users },
+                            { id: 'facilities', label: 'Facilities', icon: Building },
                             { id: 'reports', label: 'Student Reports', icon: FileText },
                             { id: 'admissions', label: 'Admissions', icon: PlusCircle },
                             { id: 'announcements', label: 'Announcements', icon: Megaphone }
@@ -1430,7 +1633,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                         background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center'
                                     }}>
                                         {selectedAssessmentIndex === -1 ? (
-                                            students.find(s => s.id === selectedStudent).photo ? (
+                                            students.find(s => s.id === selectedStudent)?.photo ? (
                                                 <img
                                                     src={students.find(s => s.id === selectedStudent).photo}
                                                     alt="Student"
@@ -1491,8 +1694,8 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                         </thead>
                                         <tbody>
                                             {(selectedAssessmentIndex === -1
-                                                ? (editingMarks ? tempMarks : students.find(s => s.id === selectedStudent).results)
-                                                : students.find(s => s.id === selectedStudent).previousResults[selectedAssessmentIndex].results
+                                                ? (editingMarks ? tempMarks : (students.find(s => s.id === selectedStudent)?.results || []))
+                                                : (students.find(s => s.id === selectedStudent)?.previousResults?.[selectedAssessmentIndex]?.results || [])
                                             ).map((result, idx) => (
                                                 <tr key={idx} style={{ borderTop: '1px solid var(--color-gray-200)' }}>
                                                     <td style={{ padding: '1rem', fontWeight: 'var(--font-weight-medium)' }}>
@@ -1972,62 +2175,32 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                     )}
 
                     {activeTab === 'announcements' && (
+                        /* existing announcements code... */
                         <div className="animate-fade-in">
                             <h2 style={{ fontSize: '1.75rem', fontWeight: 'var(--font-weight-bold)', marginBottom: '1.5rem' }}>Manage Announcements</h2>
-
                             <div className="grid grid-cols-2" style={{ gap: '2rem', alignItems: 'start' }}>
-                                {/* Form Column */}
                                 <div className="card" style={{ padding: '2rem' }}>
                                     <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.25rem', color: 'var(--color-primary)' }}>Post New Announcement</h3>
-
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                                         <div>
                                             <label className="form-label">Announcement Title</label>
-                                            <input
-                                                type="text"
-                                                className="form-input"
-                                                placeholder="e.g., Summer Vacation Notice"
-                                                value={newAnnouncement.title}
-                                                onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
-                                            />
+                                            <input type="text" className="form-input" placeholder="e.g., Summer Vacation Notice" value={newAnnouncement.title} onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })} />
                                         </div>
-
                                         <div>
                                             <label className="form-label">Publication Date</label>
-                                            <input
-                                                type="date"
-                                                className="form-input"
-                                                value={newAnnouncement.date}
-                                                onChange={(e) => setNewAnnouncement({ ...newAnnouncement, date: e.target.value })}
-                                            />
+                                            <input type="date" className="form-input" value={newAnnouncement.date} onChange={(e) => setNewAnnouncement({ ...newAnnouncement, date: e.target.value })} />
                                         </div>
-
                                         <div>
                                             <label className="form-label">Content / Details</label>
-                                            <textarea
-                                                className="form-input"
-                                                style={{ height: '120px', resize: 'vertical' }}
-                                                placeholder="Provide detailed information here..."
-                                                value={newAnnouncement.content}
-                                                onChange={(e) => setNewAnnouncement({ ...newAnnouncement, content: e.target.value })}
-                                            ></textarea>
+                                            <textarea className="form-input" style={{ height: '120px', resize: 'vertical' }} placeholder="Provide detailed information here..." value={newAnnouncement.content} onChange={(e) => setNewAnnouncement({ ...newAnnouncement, content: e.target.value })}></textarea>
                                         </div>
-
-                                        <button
-                                            onClick={addAnnouncement}
-                                            className="btn btn-primary"
-                                            style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
-                                        >
-                                            <BellPlus size={18} />
-                                            Post Announcement
+                                        <button onClick={addAnnouncement} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}>
+                                            <BellPlus size={18} /> Post Announcement
                                         </button>
                                     </div>
                                 </div>
-
-                                {/* List Column */}
                                 <div className="card" style={{ padding: '2rem' }}>
                                     <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.25rem' }}>Active Announcements</h3>
-
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                         {(!schoolData.announcements || schoolData.announcements.length === 0) ? (
                                             <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--color-gray-400)' }}>
@@ -2035,36 +2208,15 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                                 <p>No active announcements.</p>
                                             </div>
                                         ) : (
-                                            schoolData.announcements.map((ann) => (
-                                                <div key={ann.id} style={{
-                                                    padding: '1rem',
-                                                    border: '1px solid var(--color-gray-100)',
-                                                    borderRadius: 'var(--radius-md)',
-                                                    position: 'relative'
-                                                }}>
+                                            (schoolData.announcements || []).map((ann) => (
+                                                <div key={ann.id} style={{ padding: '1rem', border: '1px solid var(--color-gray-100)', borderRadius: 'var(--radius-md)', position: 'relative' }}>
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                                                         <div>
-                                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 700, marginBottom: '0.25rem' }}>
-                                                                {ann.date}
-                                                            </div>
-                                                            <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.4rem' }}>
-                                                                {ann.title}
-                                                            </div>
-                                                            <p style={{ fontSize: '0.85rem', color: 'var(--color-gray-600)', lineHeight: 1.5, margin: 0 }}>
-                                                                {ann.content}
-                                                            </p>
+                                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 700, marginBottom: '0.25rem' }}>{ann.date}</div>
+                                                            <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.4rem' }}>{ann.title}</div>
+                                                            <p style={{ fontSize: '0.85rem', color: 'var(--color-gray-600)', lineHeight: 1.5, margin: 0 }}>{ann.content}</p>
                                                         </div>
-                                                        <button
-                                                            onClick={() => deleteAnnouncement(ann.id)}
-                                                            style={{
-                                                                padding: '0.4rem',
-                                                                background: '#fee2e2',
-                                                                color: '#ef4444',
-                                                                border: 'none',
-                                                                borderRadius: '6px',
-                                                                cursor: 'pointer'
-                                                            }}
-                                                        >
+                                                        <button onClick={() => deleteAnnouncement(ann.id)} style={{ padding: '0.4rem', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
                                                             <Trash2 size={16} />
                                                         </button>
                                                     </div>
@@ -2077,9 +2229,171 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                         </div>
                     )}
 
+                    {/* ========== FACULTY TAB ========== */}
+                    {activeTab === 'faculty' && (
+                        <div className="animate-fade-in">
+                            <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+                                <h2 style={{ fontSize: '1.75rem', fontWeight: 'var(--font-weight-bold)' }}>Manage Faculty</h2>
+                                <button onClick={addFaculty} className="btn btn-primary">
+                                    <PlusCircle size={18} /> Add Faculty Member
+                                </button>
+                            </div>
+
+                            {editingFacultyId && (
+                                <div className="card" style={{ padding: '2rem', marginBottom: '2rem', border: '2px solid var(--color-primary-100)' }}>
+                                    <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1.5rem', color: 'var(--color-primary)' }}>
+                                        {editingFacultyId === 'new' ? 'New Faculty Member' : 'Edit Faculty Member'}
+                                    </h3>
+                                    <div className="grid grid-cols-2" style={{ gap: '2rem' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                                            <div style={{ width: '150px', height: '150px', borderRadius: '12px', overflow: 'hidden', background: '#f1f5f9', border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                {tempFacultyMember?.image ? (
+                                                    <img src={tempFacultyMember.image} alt="Faculty" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    <Camera size={40} color="#94a3b8" />
+                                                )}
+                                            </div>
+                                            <button onClick={() => facultyFileRef.current.click()} className="btn btn-sm" style={{ background: 'var(--color-primary)', color: 'white' }}>
+                                                Upload Photo
+                                            </button>
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                            <div>
+                                                <label className="form-label">Full Name</label>
+                                                <input type="text" className="form-input" value={tempFacultyMember.name} onChange={(e) => setTempFacultyMember({ ...tempFacultyMember, name: e.target.value })} />
+                                            </div>
+                                            <div>
+                                                <label className="form-label">Role / Designation</label>
+                                                <input type="text" className="form-input" value={tempFacultyMember.role} onChange={(e) => setTempFacultyMember({ ...tempFacultyMember, role: e.target.value })} />
+                                            </div>
+                                            <div>
+                                                <label className="form-label">Department</label>
+                                                <input type="text" className="form-input" value={tempFacultyMember.department} onChange={(e) => setTempFacultyMember({ ...tempFacultyMember, department: e.target.value })} />
+                                            </div>
+                                            <div>
+                                                <label className="form-label">Short Bio</label>
+                                                <textarea className="form-input" style={{ height: '80px' }} value={tempFacultyMember.bio} onChange={(e) => setTempFacultyMember({ ...tempFacultyMember, bio: e.target.value })}></textarea>
+                                            </div>
+                                            <div className="flex gap-2" style={{ marginTop: '1rem' }}>
+                                                <button onClick={saveFaculty} className="btn btn-success" style={{ flex: 1 }}>
+                                                    <Save size={18} /> Save Member
+                                                </button>
+                                                <button onClick={() => { setEditingFacultyId(null); setTempFacultyMember(null); }} className="btn" style={{ background: '#f1f5f9', color: '#64748b' }}>
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2" style={{ gap: '1.5rem' }}>
+                                {(schoolData.faculty || []).map((member) => (
+                                    <div key={member.id} className="card" style={{ padding: '1.25rem', display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+                                        <div style={{ width: '80px', height: '80px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0 }}>
+                                            <img src={member.image} alt={member.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{member.name}</div>
+                                            <div style={{ color: 'var(--color-primary)', fontWeight: 600, fontSize: '0.9rem' }}>{member.role}</div>
+                                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{member.department}</div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => { setEditingFacultyId(member.id); setTempFacultyMember(member); }} className="btn btn-sm btn-icon" style={{ background: '#eff6ff', color: '#2563eb' }}>
+                                                <Edit3 size={16} />
+                                            </button>
+                                            <button onClick={() => deleteFaculty(member.id)} className="btn btn-sm btn-icon" style={{ background: '#fef2f2', color: '#dc2626' }}>
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ========== FACILITIES TAB ========== */}
+                    {activeTab === 'facilities' && (
+                        <div className="animate-fade-in">
+                            <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+                                <h2 style={{ fontSize: '1.75rem', fontWeight: 'var(--font-weight-bold)' }}>Manage Facilities</h2>
+                                <button onClick={addFacility} className="btn btn-primary">
+                                    <PlusCircle size={18} /> Add Facility
+                                </button>
+                            </div>
+
+                            {editingFacilityId && (
+                                <div className="card" style={{ padding: '2rem', marginBottom: '2rem', border: '2px solid var(--color-primary-100)' }}>
+                                    <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1.5rem', color: 'var(--color-primary)' }}>
+                                        {editingFacilityId === 'new' ? 'New Facility' : 'Edit Facility'}
+                                    </h3>
+                                    <div className="grid grid-cols-2" style={{ gap: '2rem' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                                            <div style={{ width: '100%', height: '200px', borderRadius: '12px', overflow: 'hidden', background: '#f1f5f9', border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                {tempFacility?.image ? (
+                                                    <img src={tempFacility.image} alt="Facility" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    <Camera size={40} color="#94a3b8" />
+                                                )}
+                                            </div>
+                                            <button onClick={() => facilityFileRef.current.click()} className="btn btn-sm" style={{ background: 'var(--color-primary)', color: 'white' }}>
+                                                Upload Photo
+                                            </button>
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                            <div>
+                                                <label className="form-label">Facility Name</label>
+                                                <input type="text" className="form-input" value={tempFacility.name} onChange={(e) => setTempFacility({ ...tempFacility, name: e.target.value })} />
+                                            </div>
+                                            <div>
+                                                <label className="form-label">Category</label>
+                                                <input type="text" className="form-input" value={tempFacility.category} onChange={(e) => setTempFacility({ ...tempFacility, category: e.target.value })} />
+                                            </div>
+                                            <div>
+                                                <label className="form-label">Description</label>
+                                                <textarea className="form-input" style={{ height: '100px' }} value={tempFacility.description} onChange={(e) => setTempFacility({ ...tempFacility, description: e.target.value })}></textarea>
+                                            </div>
+                                            <div className="flex gap-2" style={{ marginTop: '1rem' }}>
+                                                <button onClick={saveFacility} className="btn btn-success" style={{ flex: 1 }}>
+                                                    <Save size={18} /> Save Facility
+                                                </button>
+                                                <button onClick={() => { setEditingFacilityId(null); setTempFacility(null); }} className="btn" style={{ background: '#f1f5f9', color: '#64748b' }}>
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-3" style={{ gap: '1.5rem' }}>
+                                {(schoolData.facilities || []).map((fac) => (
+                                    <div key={fac.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                                        <div style={{ height: '160px', width: '100%', position: 'relative' }}>
+                                            <img src={fac.image} alt={fac.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '5px' }}>
+                                                <button onClick={() => { setEditingFacilityId(fac.id); setTempFacility(fac); }} className="btn btn-sm btn-icon" style={{ background: 'white', color: '#2563eb', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                                                    <Edit3 size={14} />
+                                                </button>
+                                                <button onClick={() => deleteFacility(fac.id)} className="btn btn-sm btn-icon" style={{ background: 'white', color: '#dc2626', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div style={{ padding: '1.25rem' }}>
+                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>{fac.category}</div>
+                                            <div style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.5rem' }}>{fac.name}</div>
+                                            <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>{fac.description}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                 </div>
-            </section >
-        </div >
+            </section>
+        </div>
     );
 };
 

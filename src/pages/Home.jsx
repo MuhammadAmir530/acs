@@ -273,7 +273,7 @@ const Home = ({ setCurrentPage }) => {
                         transform: heroLoaded ? 'translateY(0)' : 'translateY(40px)',
                         transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1) 0.2s'
                     }}>
-                        {schoolData.tagline.split('\n').map((line, i) => (
+                        {(schoolData.tagline || '').split('\n').map((line, i) => (
                             <React.Fragment key={i}>
                                 {i === 1 ? (
                                     <span style={{
@@ -534,7 +534,7 @@ const Home = ({ setCurrentPage }) => {
                         }}>Numbers That Speak</h2>
                     </Reveal>
                     <div className="grid grid-cols-4" style={{ gap: '2rem', textAlign: 'center' }}>
-                        {schoolData.statistics.map((stat, idx) => {
+                        {schoolData.statistics?.map((stat, idx) => {
                             const icons = [GraduationCap, Users, Trophy, Star];
                             const colors = ['#2563eb', '#7c3aed', '#059669', '#d97706'];
                             const IconComp = icons[idx % icons.length];
@@ -718,7 +718,7 @@ const Home = ({ setCurrentPage }) => {
                     </Reveal>
 
                     <div className="grid grid-cols-3" style={{ gap: '2rem' }}>
-                        {schoolData.testimonials.map((testimonial, idx) => (
+                        {schoolData.testimonials?.map((testimonial, idx) => (
                             <Reveal key={testimonial.id} delay={idx * 0.15} direction={idx === 0 ? 'left' : idx === 2 ? 'right' : 'up'}>
                                 <TiltCard
                                     className="card"

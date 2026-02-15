@@ -12,6 +12,7 @@ import StudentPortal from './pages/StudentPortal';
 import AdminPortal from './pages/AdminPortal';
 import DeveloperPanel from './pages/DeveloperPanel';
 import Blog from './pages/Blog';
+import WhatsAppButton from './components/WhatsAppButton';
 
 function App() {
     const [currentPage, setCurrentPage] = useState('home');
@@ -86,6 +87,7 @@ function App() {
                     {renderPage()}
                 </main>
                 <Footer />
+                <WhatsAppButton />
             </div>
         </SchoolDataProvider>
     );
