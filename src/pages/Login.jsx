@@ -242,7 +242,7 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setIsDeveloper, setCurrentPage, setL
                         <strong>Admin:</strong> admin / admin123
                     </div>
                     <div>
-                        <strong>Developer:</strong> developer / dev123
+                        <strong>Developer:</strong> ****** / ******
                     </div>
                 </div>
             </div>
