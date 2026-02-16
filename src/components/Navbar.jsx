@@ -65,66 +65,40 @@ const Navbar = ({ currentPage, setCurrentPage, isLoggedIn, isAdmin, isDeveloper 
                     </div>
                 </div>
 
-                {/* Desktop Menu */}
-                <div className="hidden md:flex" style={{ gap: '2rem', alignItems: 'center' }}>
-                    {navItems.map((item) => (
+                {/* Right Side Actions */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                    {/* Desktop Login Button */}
+                    <div className="hidden md:flex">
                         <button
-                            key={item.id}
-                            onClick={() => setCurrentPage(item.id)}
-                            className="nav-link"
+                            onClick={() => setCurrentPage(isLoggedIn ? 'portal' : isAdmin ? 'admin' : isDeveloper ? 'developer' : 'login')}
+                            className="btn btn-primary"
                             style={{
-                                color: currentPage === item.id ? '#fbbf24' : 'rgba(255,255,255,0.8)',
-                                fontWeight: currentPage === item.id ? 600 : 400,
-                                position: 'relative',
-                                transition: 'all 0.3s ease'
+                                padding: '0.6rem 1.5rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                borderRadius: '50px',
+                                fontWeight: 600
                             }}
                         >
-                            {item.label}
-                            {currentPage === item.id && (
-                                <span style={{
-                                    position: 'absolute',
-                                    bottom: '-6px',
-                                    left: 0,
-                                    width: '100%',
-                                    height: '2px',
-                                    background: '#fbbf24',
-                                    borderRadius: '2px',
-                                    boxShadow: '0 0 8px #fbbf24'
-                                }} />
-                            )}
+                            {isLoggedIn ? <div style={{ width: '8px', height: '8px', background: '#4ade80', borderRadius: '50%' }} /> : <LogIn size={18} />}
+                            {isLoggedIn ? 'Student Portal' : isAdmin ? 'Admin Portal' : isDeveloper ? 'Developer Panel' : 'Login'}
                         </button>
-                    ))}
+                    </div>
 
+                    {/* Menu Button (Always Visible) */}
                     <button
-                        onClick={() => setCurrentPage(isLoggedIn ? 'portal' : isAdmin ? 'admin' : isDeveloper ? 'developer' : 'login')}
-                        className="btn btn-primary"
-                        style={{
-                            padding: '0.6rem 1.5rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            borderRadius: '50px',
-                            fontWeight: 600
-                        }}
+                        onClick={() => setIsOpen(!isOpen)}
+                        style={{ color: 'white', display: 'flex', alignItems: 'center' }}
                     >
-                        {isLoggedIn ? <div style={{ width: '8px', height: '8px', background: '#4ade80', borderRadius: '50%' }} /> : <LogIn size={18} />}
-                        {isLoggedIn ? 'Student Portal' : isAdmin ? 'Admin Portal' : isDeveloper ? 'Developer Panel' : 'Login'}
+                        {isOpen ? <X size={28} /> : <Menu size={28} />}
                     </button>
                 </div>
-
-                {/* Mobile Menu Button */}
-                <button
-                    className="md:hidden"
-                    onClick={() => setIsOpen(!isOpen)}
-                    style={{ color: 'white' }}
-                >
-                    {isOpen ? <X size={28} /> : <Menu size={28} />}
-                </button>
             </div>
 
-            {/* Mobile Menu Dropdown */}
+            {/* Navigation Menu Dropdown (All Screens) */}
             {isOpen && (
-                <div className="md:hidden animate-fade-in" style={{
+                <div className="animate-fade-in" style={{
                     position: 'absolute',
                     top: '80px',
                     left: 0,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Send, MapPin, Phone, Mail, Clock, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import { useSchoolData } from '../context/SchoolDataContext';
 import emailjs from '@emailjs/browser';
@@ -10,6 +10,10 @@ const EMAILJS_TEMPLATE_ID = 'template_contact'; // Your EmailJS template ID
 const EMAILJS_PUBLIC_KEY = 'YOUR_PUBLIC_KEY';    // Your EmailJS public key
 
 const Contact = () => {
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
+
     const { schoolData } = useSchoolData();
     const [formData, setFormData] = useState({
         name: '',
