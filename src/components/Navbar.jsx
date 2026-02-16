@@ -40,7 +40,7 @@ const Navbar = ({ currentPage, setCurrentPage, isLoggedIn, isAdmin, isDeveloper 
                         overflow: 'hidden'
                     }}>
                         <img
-                            src="/src/assets/logo.png"
+                            src="/logo.png"
                             alt="ACS Logo"
                             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                             onError={(e) => {

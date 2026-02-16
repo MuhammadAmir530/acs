@@ -51,7 +51,8 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
             photos: false,
             bform: false,
             cnic: false
-        }
+        },
+        photo: ''
     };
     const [admissionData, setAdmissionData] = useState(admissionInitialState);
 
@@ -205,7 +206,6 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         setTimeout(() => setSaveMessage(''), 3000);
     };
 
-    // --- PHOTO UPLOAD TO SUPABASE STORAGE ---
     const uploadImage = async (file, bucket) => {
         try {
             const fileExt = file.name.split('.').pop();
@@ -230,9 +230,57 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         }
     };
 
-    // --- ADMISSION FORM PRINTING ---
-    const printAdmissionForm = () => {
+    const handleAdmissionPhotoUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const publicUrl = await uploadImage(file, 'students');
+        if (publicUrl) {
+            setAdmissionData(prev => ({ ...prev, photo: publicUrl }));
+            showSaveMessage('Admission photo uploaded!');
+        }
+    };
+
+    // --- ADMISSION FORM PRINTING & SAVING ---
+    const printAdmissionForm = async () => {
         const d = admissionData;
+
+        if (!d.studentName.trim()) {
+            alert("Please enter Student Name first!");
+            return;
+        }
+
+        // 1. Save to Supabase
+        try {
+            const nextIdNum = students.length + 1;
+            const year = new Date().getFullYear();
+            const studentId = `ACS-${year}-${nextIdNum.toString().padStart(3, '0')}`;
+
+            const newStudentRecord = {
+                id: studentId,
+                name: d.studentName,
+                password: 'acs' + Math.floor(1000 + Math.random() * 9000), // Random temporary password
+                grade: d.applyingFor,
+                image: d.photo,
+                fee_status: 'unpaid',
+                admissions: [d], // Store form history
+                results: [],
+                attendance: { present: 0, absent: 0, total: 0, percentage: 0 },
+                previous_results: []
+            };
+
+            const { error } = await supabase.from('students').insert([newStudentRecord]);
+
+            if (error) throw error;
+
+            await fetchData(); // Refresh local state
+            showSaveMessage(`Student ${d.studentName} saved with ID: ${studentId}`);
+        } catch (error) {
+            console.error("Error saving admission:", error.message);
+            alert("Error saving to database, but printing will continue: " + error.message);
+        }
+
+        // 2. Print Logic
 
         // Helper to create boxed character spans
         const boxChars = (str, length, spacing = 0) => {
@@ -258,24 +306,24 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                     height: 297mm; 
                     margin: 0 auto; 
                     background: #fff; 
-                    padding: 15mm 20mm; 
+                    padding: 12mm 15mm; 
                     position: relative; 
                     box-shadow: 0 0 10px rgba(0,0,0,0.1);
                 }
                 .header-container {
                     display: flex;
                     align-items: center;
-                    border: 2px solid #1e3a8a;
-                    padding: 15px;
-                    border-radius: 8px;
-                    margin-bottom: 20px;
+                    border: 2.5px solid #1e3a8a;
+                    padding: 15px 25px;
+                    border-radius: 12px;
+                    margin-bottom: 25px;
                     position: relative;
-                    background: linear-gradient(to right, #ffffff, #f0f7ff);
+                    background: linear-gradient(135deg, #ffffff, #f8fafc);
                 }
                 .header-logo {
-                    width: 90px;
-                    height: 90px;
-                    margin-right: 20px;
+                    width: 100px;
+                    height: auto;
+                    margin-right: 25px;
                 }
                 .header-text {
                     flex: 1;
@@ -305,22 +353,22 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                     background: #f97316; 
                     color: #fff; 
                     display: inline-block; 
-                    padding: 3px 12px; 
+                    padding: 4px 15px; 
                     font-weight: 800; 
                     border-radius: 4px; 
-                    margin: 12px 0 8px; 
-                    font-size: 13px; 
+                    margin: 22px 0 12px; 
+                    font-size: 14px; 
                     text-transform: uppercase;
                 }
-                .field-row { display: flex; align-items: center; margin-bottom: 6px; font-size: 12px; }
+                .field-row { display: flex; align-items: center; margin-bottom: 11px; font-size: 12px; }
                 .field-label { width: 130px; font-weight: 700; font-size: 10px; text-transform: uppercase; color: #334155; }
                 .boxed-row { display: flex; gap: 1px; }
                 .photo-box { 
                     position: absolute; 
-                    top: 130px; 
-                    right: 20mm; 
-                    width: 32mm; 
-                    height: 40mm; 
+                    top: 195px; 
+                    right: 15mm; 
+                    width: 35mm; 
+                    height: 44mm; 
                     border: 2px dashed #64748b; 
                     display: flex; 
                     flex-direction: column; 
@@ -336,7 +384,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                 .checkbox { display: flex; align-items: center; gap: 4px; font-weight: 600; }
                 .box { width: 13px; height: 13px; border: 1.5px solid #000; }
                 .underline { border-bottom: 1.5px solid #e2e8f0; flex: 1; padding: 0 5px; min-height: 18px; font-weight: 700; color: #1e293b; }
-                .meta-header { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 10px; }
+                .meta-header { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 20px; }
                 
                 @media print {
                     @page { size: A4; margin: 0; }
@@ -358,7 +406,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
             </div>
             <div class="page">
                 <div class="header-container">
-                    <img src="/src/assets/logo.png" class="header-logo" onerror="this.style.visibility='hidden'" />
+                    <img src="/logo.png" class="header-logo" onerror="this.style.display='none'" />
                     <div class="header-text">
                         <h1>ACS School & College</h1>
                         <p>Main Jhang Road Near Attock Petrol Pump, Painsra, Faisalabad</p>
@@ -376,8 +424,10 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                 </div>
 
                 <div class="photo-box">
+                    ${d.photo ? `<img src="${d.photo}" style="width:100%;height:100%;object-fit:cover;" />` : `
                     <b>Photograph</b>
                     <span>(Passport Size)</span>
+                    `}
                 </div>
 
                 <div class="section-title" style="background:#1e3a8a">Student's Information</div>
@@ -965,12 +1015,13 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                 }
                 .page {
                     max-width: 820px;
-                    margin: 24px auto;
+                    margin: 10px auto;
                     background: #ffffff;
                     box-shadow: 0 4px 24px rgba(0,0,0,0.08);
                     border-radius: 8px;
                     overflow: hidden;
                 }
+                @page { margin: 0; size: auto; }
             </style>
         </head>
         <body>
@@ -986,16 +1037,17 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                 <div style="height:6px;background:linear-gradient(90deg,#0f2b52,#1a3a6b,#2563eb,#1a3a6b,#0f2b52);"></div>
 
                 <!-- School Header -->
-                <div style="text-align:center;padding:36px 40px 28px;border-bottom:3px double #1a3a6b;">
+                <div style="text-align:center;padding:24px 40px 18px;border-bottom:3px double #1a3a6b;page-break-inside:avoid;">
                     <!-- School Logo and Name Info -->
-                    <div style="display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:15px;">
-                        <img src="/src/assets/logo.png" style="width:100px;height:auto;border-radius:8px;" onerror="this.style.display='none'" />
+                    <div style="display:flex;align-items:center;justify-content:center;gap:15px;margin-bottom:10px;">
+                        <img src="/logo.png" style="width:105px;height:auto;border-radius:0;" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+                        <div style="display:none;width:105px;height:105px;background:#f1f5f9;border-radius:10px;align-items:center;justify-content:center;font-size:40px;">🏫</div>
                         <div style="text-align:left;">
-                            <h1 style="font-family:'Playfair Display',Georgia,serif;font-size:32px;font-weight:800;color:#1a3a6b;letter-spacing:1px;margin:0;">
+                            <h1 style="font-family:'Playfair Display',Georgia,serif;font-size:28px;font-weight:800;color:#1a3a6b;letter-spacing:1px;margin:0;">
                                 ${schoolName}
                             </h1>
-                            <p style="font-size:12px;color:#64748b;letter-spacing:0.8px;margin-top:4px;">${schoolAddress}</p>
-                            ${schoolPhone || schoolEmail ? `<p style="font-size:11px;color:#94a3b8;letter-spacing:0.5px;margin-top:2px;">${schoolPhone}${schoolPhone && schoolEmail ? ' • ' : ''}${schoolEmail}</p>` : ''}
+                            <p style="font-size:11px;color:#64748b;letter-spacing:0.8px;margin-top:2px;">${schoolAddress}</p>
+                            ${schoolPhone || schoolEmail ? `<p style="font-size:10px;color:#94a3b8;letter-spacing:0.5px;margin-top:1px;">${schoolPhone}${schoolPhone && schoolEmail ? ' • ' : ''}${schoolEmail}</p>` : ''}
                         </div>
                     </div>
                     
@@ -1010,63 +1062,63 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                 </div>
                 
                 <!-- Student Info -->
-                <div style="padding:20px 40px;">
+                <div style="padding:15px 40px;">
                     <div style="display:flex;align-items:center;gap:20px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
                         <!-- Student Photo -->
-                        <div style="width:90px;height:90px;flex-shrink:0;background:linear-gradient(135deg,#1a3a6b,#2563eb);display:flex;align-items:center;justify-content:center;margin:16px 0 16px 20px;border-radius:10px;overflow:hidden;">
-                            ${student.photo ? `<img src="${student.photo}" style="width:100%;height:100%;object-fit:cover;" alt="${student.name}" />` : `<span style="font-size:32px;font-weight:800;color:white;font-family:'Playfair Display',Georgia,serif;">${student.name.split(' ').map(n => n[0]).join('').substring(0, 2)}</span>`}
+                        <div style="width:75px;height:75px;flex-shrink:0;background:linear-gradient(135deg,#1a3a6b,#2563eb);display:flex;align-items:center;justify-content:center;margin:12px 0 12px 20px;border-radius:10px;overflow:hidden;">
+                            ${(student.photo || student.image) ? `<img src="${student.photo || student.image}" style="width:100%;height:100%;object-fit:cover;" alt="${student.name}" />` : `<span style="font-size:28px;font-weight:800;color:white;font-family:'Playfair Display',Georgia,serif;">${student.name.split(' ').map(n => n[0]).join('').substring(0, 2)}</span>`}
                         </div>
                         <div style="display:flex;flex-wrap:wrap;flex:1;gap:0;">
-                            <div style="flex:1;min-width:150px;padding:14px 18px;background:#f8fafc;border-right:1px solid #e2e8f0;">
-                                <div style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;font-weight:700;margin-bottom:3px;">Student Name</div>
-                                <div style="font-size:15px;font-weight:700;color:#1a3a6b;">${student.name}</div>
+                            <div style="flex:1;min-width:150px;padding:10px 18px;background:#f8fafc;border-right:1px solid #e2e8f0;">
+                                <div style="font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;font-weight:700;margin-bottom:2px;">Student Name</div>
+                                <div style="font-size:14px;font-weight:700;color:#1a3a6b;">${student.name}</div>
                             </div>
-                            <div style="flex:1;min-width:100px;padding:14px 18px;background:#f8fafc;border-right:1px solid #e2e8f0;">
-                                <div style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;font-weight:700;margin-bottom:3px;">Student ID</div>
-                                <div style="font-size:15px;font-weight:700;color:#2d3748;">${student.id}</div>
+                            <div style="flex:1;min-width:100px;padding:10px 18px;background:#f8fafc;border-right:1px solid #e2e8f0;">
+                                <div style="font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;font-weight:700;margin-bottom:2px;">Student ID</div>
+                                <div style="font-size:14px;font-weight:700;color:#2d3748;">${student.id}</div>
                             </div>
-                            <div style="flex:1;min-width:80px;padding:14px 18px;background:#f8fafc;border-right:1px solid #e2e8f0;">
-                                <div style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;font-weight:700;margin-bottom:3px;">Class</div>
-                                <div style="font-size:15px;font-weight:700;color:#2d3748;">${student.grade}</div>
+                            <div style="flex:1;min-width:80px;padding:10px 18px;background:#f8fafc;border-right:1px solid #e2e8f0;">
+                                <div style="font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;font-weight:700;margin-bottom:2px;">Class</div>
+                                <div style="font-size:14px;font-weight:700;color:#2d3748;">${student.grade}</div>
                             </div>
-                            <div style="flex:1;min-width:110px;padding:14px 18px;background:#f8fafc;">
-                                <div style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;font-weight:700;margin-bottom:3px;">Report Date</div>
-                                <div style="font-size:15px;font-weight:700;color:#2d3748;">${today}</div>
+                            <div style="flex:1;min-width:110px;padding:10px 18px;background:#f8fafc;">
+                                <div style="font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;font-weight:700;margin-bottom:2px;">Report Date</div>
+                                <div style="font-size:14px;font-weight:700;color:#2d3748;">${today}</div>
                             </div>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Main Content -->
-                <div style="padding:0 40px 24px;">
+                <div style="padding:0 40px 16px;">
                 
                     <!-- Current Term Results -->
-                    <div style="margin-bottom:24px;">
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                    <div style="margin-bottom:16px;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
                             <div style="width:4px;height:24px;background:#1a3a6b;border-radius:2px;"></div>
-                            <h3 style="font-family:'Playfair Display',Georgia,serif;font-size:17px;font-weight:700;color:#1a3a6b;margin:0;">Current Term Results</h3>
+                            <h3 style="font-family:'Playfair Display',Georgia,serif;font-size:16px;font-weight:700;color:#1a3a6b;margin:0;">Current Term Results</h3>
                         </div>
                         <table style="width:100%;border-collapse:collapse;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
                             <thead>
                                 <tr style="background:linear-gradient(135deg,#1a3a6b,#1e4d8a);">
-                                    <th style="padding:12px 16px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#ffffff;font-weight:700;">Subject</th>
-                                    <th style="padding:12px 16px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#ffffff;font-weight:700;">Score</th>
-                                    <th style="padding:12px 16px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#ffffff;font-weight:700;">Grade</th>
-                                    <th style="padding:12px 16px;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#ffffff;font-weight:700;">Performance</th>
+                                    <th style="padding:10px 16px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#ffffff;font-weight:700;">Subject</th>
+                                    <th style="padding:10px 16px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#ffffff;font-weight:700;">Score</th>
+                                    <th style="padding:10px 16px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#ffffff;font-weight:700;">Grade</th>
+                                    <th style="padding:10px 16px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#ffffff;font-weight:700;">Performance</th>
                                 </tr>
                             </thead>
                             <tbody>${resultsRows}</tbody>
                             <tfoot>
                                 <tr style="background:linear-gradient(135deg,#f0f7ff,#e8f0fc);border-top:2px solid #1a3a6b;">
-                                    <td style="padding:14px 16px;font-size:14px;font-weight:800;color:#1a3a6b;">Overall Average</td>
-                                    <td style="padding:14px 16px;text-align:center;">
-                                        <span style="font-size:18px;font-weight:800;color:#1a3a6b;">${avg}%</span>
+                                    <td style="padding:12px 16px;font-size:13px;font-weight:800;color:#1a3a6b;">Overall Average</td>
+                                    <td style="padding:12px 16px;text-align:center;">
+                                        <span style="font-size:16px;font-weight:800;color:#1a3a6b;">${avg}%</span>
                                     </td>
-                                    <td style="padding:14px 16px;text-align:center;">
-                                        <span style="display:inline-block;width:42px;height:42px;line-height:42px;border-radius:50%;font-weight:800;font-size:16px;background:#1a3a6b;color:white;text-align:center;">${overallGrade}</span>
+                                    <td style="padding:12px 16px;text-align:center;">
+                                        <span style="display:inline-block;width:38px;height:38px;line-height:38px;border-radius:50%;font-weight:800;font-size:15px;background:#1a3a6b;color:white;text-align:center;">${overallGrade}</span>
                                     </td>
-                                    <td style="padding:14px 16px;text-align:center;">
-                                        <span style="font-size:12px;font-weight:700;color:${gradeColor(parseFloat(avg))};">${parseFloat(avg) >= 85 ? 'Excellent' : parseFloat(avg) >= 70 ? 'Good' : parseFloat(avg) >= 50 ? 'Satisfactory' : 'Needs Improvement'}</span>
+                                    <td style="padding:12px 16px;text-align:center;">
+                                        <span style="font-size:11px;font-weight:700;color:${gradeColor(parseFloat(avg))};">${parseFloat(avg) >= 85 ? 'Excellent' : parseFloat(avg) >= 70 ? 'Good' : parseFloat(avg) >= 50 ? 'Satisfactory' : 'Needs Improvement'}</span>
                                     </td>
                                 </tr>
                             </tfoot>
@@ -1074,28 +1126,28 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                     </div>
                 
                     <!-- Attendance -->
-                    <div style="margin-bottom:24px;page-break-inside:avoid;">
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <div style="margin-bottom:16px;page-break-inside:avoid;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
                             <div style="width:4px;height:20px;background:#1a3a6b;border-radius:2px;"></div>
-                            <h3 style="font-family:'Playfair Display',Georgia,serif;font-size:15px;font-weight:700;color:#1a3a6b;margin:0;">Attendance Record</h3>
+                            <h3 style="font-family:'Playfair Display',Georgia,serif;font-size:14px;font-weight:700;color:#1a3a6b;margin:0;">Attendance Record</h3>
                         </div>
                         <div style="border:1px solid #edf2f7;border-radius:10px;overflow:hidden;">
                             <div style="display:flex;text-align:center;">
-                                <div style="flex:1;padding:14px 10px;background:#f0fdf4;border-right:1px solid #edf2f7;">
-                                    <div style="font-size:22px;font-weight:800;color:#0d7c52;">${student.attendance.present}</div>
-                                    <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;font-weight:600;margin-top:2px;">Present</div>
+                                <div style="flex:1;padding:10px 10px;background:#f0fdf4;border-right:1px solid #edf2f7;">
+                                    <div style="font-size:18px;font-weight:800;color:#0d7c52;">${student.attendance.present}</div>
+                                    <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;font-weight:600;margin-top:2px;">Present</div>
                                 </div>
-                                <div style="flex:1;padding:14px 10px;background:#fef2f2;border-right:1px solid #edf2f7;">
-                                    <div style="font-size:22px;font-weight:800;color:#c0392b;">${student.attendance.absent}</div>
-                                    <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;font-weight:600;margin-top:2px;">Absent</div>
+                                <div style="flex:1;padding:10px 10px;background:#fef2f2;border-right:1px solid #edf2f7;">
+                                    <div style="font-size:18px;font-weight:800;color:#c0392b;">${student.attendance.absent}</div>
+                                    <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;font-weight:600;margin-top:2px;">Absent</div>
                                 </div>
-                                <div style="flex:1;padding:14px 10px;background:#eff6ff;border-right:1px solid #edf2f7;">
-                                    <div style="font-size:22px;font-weight:800;color:#1a5fb4;">${student.attendance.total}</div>
-                                    <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;font-weight:600;margin-top:2px;">Total</div>
+                                <div style="flex:1;padding:10px 10px;background:#eff6ff;border-right:1px solid #edf2f7;">
+                                    <div style="font-size:18px;font-weight:800;color:#1a5fb4;">${student.attendance.total}</div>
+                                    <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;font-weight:600;margin-top:2px;">Total</div>
                                 </div>
-                                <div style="flex:1;padding:14px 10px;background:linear-gradient(135deg,#0f2b52,#1a3a6b);color:white;">
-                                    <div style="font-size:22px;font-weight:800;">${student.attendance.percentage}%</div>
-                                    <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.8px;opacity:0.8;font-weight:600;margin-top:2px;">Rate</div>
+                                <div style="flex:1;padding:10px 10px;background:linear-gradient(135deg,#0f2b52,#1a3a6b);color:white;">
+                                    <div style="font-size:18px;font-weight:800;">${student.attendance.percentage}%</div>
+                                    <div style="font-size:8px;text-transform:uppercase;letter-spacing:0.8px;opacity:0.8;font-weight:600;margin-top:2px;">Rate</div>
                                 </div>
                             </div>
                         </div>
@@ -1104,18 +1156,18 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                     ${previousSection}
                 
                     <!-- Signature Section -->
-                    <div style="margin-top:36px;padding-top:18px;border-top:1px solid #edf2f7;display:flex;justify-content:space-between;flex-wrap:wrap;gap:20px;">
-                        <div style="text-align:center;">
-                            <div style="width:180px;border-bottom:2px solid #1a3a6b;margin-bottom:8px;height:40px;"></div>
-                            <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Class Teacher</div>
+                    <div style="margin-top:20px;padding-top:12px;border-top:1px solid #edf2f7;display:flex;justify-content:space-between;flex-wrap:wrap;gap:15px;page-break-inside:avoid;">
+                        <div style="text-align:center;flex:1;min-width:120px;">
+                            <div style="width:100%;max-width:160px;border-bottom:1.5px solid #1a3a6b;margin:0 auto 6px;height:25px;"></div>
+                            <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Class Teacher</div>
                         </div>
-                        <div style="text-align:center;">
-                            <div style="width:180px;border-bottom:2px solid #1a3a6b;margin-bottom:8px;height:40px;"></div>
-                            <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Principal</div>
+                        <div style="text-align:center;flex:1;min-width:120px;">
+                            <div style="width:100%;max-width:160px;border-bottom:1.5px solid #1a3a6b;margin:0 auto 6px;height:25px;"></div>
+                            <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Principal</div>
                         </div>
-                        <div style="text-align:center;">
-                            <div style="width:180px;border-bottom:2px solid #1a3a6b;margin-bottom:8px;height:40px;"></div>
-                            <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Parent / Guardian</div>
+                        <div style="text-align:center;flex:1;min-width:120px;">
+                            <div style="width:100%;max-width:160px;border-bottom:1.5px solid #1a3a6b;margin:0 auto 6px;height:25px;"></div>
+                            <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Parent / Guardian</div>
                         </div>
                     </div>
                 </div>
@@ -1894,7 +1946,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                         className="btn btn-primary"
                                         style={{ background: '#4d7c0f', borderColor: '#4d7c0f' }}
                                     >
-                                        <FileText size={18} /> Print Admission Form
+                                        <Save size={18} /> Save & Print Form
                                     </button>
                                 </div>
                             </div>
@@ -1992,6 +2044,18 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                                 value={admissionData.religion}
                                                 onChange={(e) => setAdmissionData({ ...admissionData, religion: e.target.value })}
                                             />
+                                        </div>
+                                        <div>
+                                            <label className="form-label">Student Photograph</label>
+                                            <div className="flex gap-4" style={{ alignItems: 'center' }}>
+                                                <div style={{ width: '60px', height: '80px', background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyItems: 'center' }}>
+                                                    {admissionData.photo ? <img src={admissionData.photo} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Camera size={20} style={{ margin: 'auto', color: '#94a3b8' }} />}
+                                                </div>
+                                                <button onClick={() => photoFileRef.current.click()} className="btn btn-sm" style={{ background: 'var(--color-primary)', color: 'white' }}>
+                                                    <Camera size={14} /> Upload Photo
+                                                </button>
+                                            </div>
+                                            <input type="file" ref={photoFileRef} style={{ display: 'none' }} accept="image/*" onChange={handleAdmissionPhotoUpload} />
                                         </div>
                                     </div>
                                 </div>
