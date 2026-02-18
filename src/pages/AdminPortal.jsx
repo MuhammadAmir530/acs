@@ -11,7 +11,7 @@ import { useSchoolData } from '../context/SchoolDataContext';
 import { supabase } from '../supabaseClient';
 
 const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
-    const { schoolData, CLASSES, fetchData, setStudents, setFaculty, updateSchoolInfo, setAnnouncements } = useSchoolData();
+    const { schoolData, CLASSES, fetchData, setStudents, setFaculty, updateSchoolInfo, setAnnouncements, updateClasses } = useSchoolData();
     const [activeTab, setActiveTab] = useState('marks');
     const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', date: new Date().toISOString().split('T')[0] });
     const [selectedStudent, setSelectedStudent] = useState(null);
@@ -143,11 +143,20 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     const photoFileRef = useRef(null);
     const facultyFileRef = useRef(null);
     const facilityFileRef = useRef(null);
+    const blogImageRef = useRef(null);
 
     const [editingFacultyId, setEditingFacultyId] = useState(null);
     const [editingFacilityId, setEditingFacilityId] = useState(null);
     const [tempFacultyMember, setTempFacultyMember] = useState(null);
     const [tempFacility, setTempFacility] = useState(null);
+    const [editingBlogId, setEditingBlogId] = useState(null);
+    const [tempBlog, setTempBlog] = useState(null);
+
+    // Class Management State
+    const [selectedClassForList, setSelectedClassForList] = useState(CLASSES[0]);
+    const [classListSearch, setClassListSearch] = useState('');
+    const [newClassName, setNewClassName] = useState('');
+    const classImportFileRef = useRef(null);
 
     const students = schoolData.students || [];
 
@@ -1314,6 +1323,158 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         }
     };
 
+    // --- BLOG MANAGEMENT ---
+    const addBlog = () => {
+        setEditingBlogId('new');
+        setTempBlog({
+            title: '',
+            excerpt: '',
+            content: '',
+            author: 'Admin',
+            date: new Date().toISOString().split('T')[0],
+            category: 'Events',
+            read_time: '3 min read',
+            image: ''
+        });
+    };
+
+    const saveBlog = async () => {
+        if (!tempBlog.title || !tempBlog.excerpt || !tempBlog.content) {
+            showSaveMessage('Title, excerpt, and content are required!');
+            return;
+        }
+
+        if (editingBlogId === 'new') {
+            const { error } = await supabase.from('blogs').insert([tempBlog]);
+            if (error) {
+                alert('Error adding blog: ' + error.message);
+                return;
+            }
+            showSaveMessage('Blog post added!');
+        } else {
+            const { id, created_at, updated_at, ...payload } = tempBlog;
+            const { error } = await supabase.from('blogs').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', editingBlogId);
+            if (error) {
+                alert('Error updating blog: ' + error.message);
+                return;
+            }
+            showSaveMessage('Blog post updated!');
+        }
+        setEditingBlogId(null);
+        setTempBlog(null);
+        await fetchData();
+    };
+
+    const deleteBlog = async (id) => {
+        if (window.confirm('Are you sure you want to delete this blog post?')) {
+            const { error } = await supabase.from('blogs').delete().eq('id', id);
+            if (error) {
+                alert('Error deleting blog: ' + error.message);
+            } else {
+                await fetchData();
+                showSaveMessage('Blog post deleted!');
+            }
+        }
+    };
+
+    const handleBlogImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const publicUrl = await uploadImage(file, 'blogs');
+        if (publicUrl) {
+            setTempBlog(prev => ({ ...prev, image: publicUrl }));
+            showSaveMessage('Blog image uploaded!');
+        }
+        e.target.value = '';
+    };
+
+    // --- CLASS MANAGEMENT FUNCTIONS ---
+    const downloadClassTemplate = () => {
+        const templateData = [{
+            'Student Name': 'Ali Ahmed', 'B-Form Number': '12345-1234567-1', 'Date of Birth': '2010-01-15',
+            'Gender': 'Male', 'Religion': 'Islam', 'Nationality': 'Pakistani', 'Father Name': 'Ahmed Khan',
+            'Father CNIC': '12345-1234567-1', 'Contact Number': '03001234567', 'WhatsApp Number': '03001234567',
+            'Address': '123 Street, City', 'Allergies': 'No', 'Allergies Details': '',
+            'Chronic Condition': 'No', 'Chronic Condition Details': '', 'Medication': 'No',
+            'Medication Details': '', 'Fee Status': 'Pending'
+        }];
+        const ws = XLSX.utils.json_to_sheet(templateData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Students');
+        ws['!cols'] = Array(18).fill({ wch: 15 });
+        XLSX.writeFile(wb, `Class_${selectedClassForList}_Template.xlsx`);
+        showSaveMessage('Template downloaded!');
+    };
+
+    const importStudentsExcel = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+            try {
+                const bstr = evt.target.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                if (data.length === 0) { alert('Excel file is empty!'); return; }
+                let successCount = 0, errorCount = 0;
+                const currentYear = new Date().getFullYear();
+                let maxNumber = Math.max(0, ...students.filter(s => s.id.startsWith(`ACS-${currentYear}`)).map(s => parseInt(s.id.split('-')[2]) || 0));
+                for (let i = 0; i < data.length; i++) {
+                    const row = data[i];
+                    if (!row['Student Name'] || !row['Gender'] || !row['Father Name'] || !row['Contact Number']) {
+                        errorCount++; continue;
+                    }
+                    maxNumber++;
+                    const studentId = `ACS-${currentYear}-${String(maxNumber).padStart(3, '0')}`;
+                    const password = Math.random().toString(36).slice(-8);
+                    const newStudent = {
+                        id: studentId, password, name: row['Student Name'], grade: selectedClassForList,
+                        image: '', fee_status: row['Fee Status'] || 'Pending', results: [], attendance: {},
+                        previous_results: [], admissions: [{
+                            applyingFor: selectedClassForList, applicationDate: new Date().toISOString().split('T')[0],
+                            studentName: row['Student Name'], bForm: row['B-Form Number'] || '', dob: row['Date of Birth'] || '',
+                            nationality: row['Nationality'] || 'Pakistani', gender: row['Gender'], religion: row['Religion'] || '',
+                            allergies: row['Allergies'] || 'No', allergiesDetails: row['Allergies Details'] || '',
+                            chronicCondition: row['Chronic Condition'] || 'No', chronicConditionDetails: row['Chronic Condition Details'] || '',
+                            medication: row['Medication'] || 'No', medicationDetails: row['Medication Details'] || '',
+                            fatherName: row['Father Name'], fatherCnic: row['Father CNIC'] || '',
+                            contact: row['Contact Number'], whatsapp: row['WhatsApp Number'] || row['Contact Number'],
+                            address: row['Address'] || '', docs: { photos: false, bform: false, cnic: false }, photo: ''
+                        }]
+                    };
+                    const { error } = await supabase.from('students').insert([newStudent]);
+                    if (error) errorCount++; else successCount++;
+                }
+                await fetchData();
+                showSaveMessage(`Import complete! ✅ ${successCount} added, ❌ ${errorCount} failed`);
+            } catch (error) { alert('Error reading Excel: ' + error.message); }
+        };
+        reader.readAsBinaryString(file);
+        e.target.value = '';
+    };
+
+    const exportClassRoster = () => {
+        const classStudents = students.filter(s => s.grade === selectedClassForList);
+        if (classStudents.length === 0) { alert('No students in this class!'); return; }
+        const exportData = classStudents.map(s => {
+            const adm = s.admissions?.[0] || {};
+            return {
+                'Student ID': s.id, 'Student Name': s.name, 'B-Form Number': adm.bForm || '',
+                'Date of Birth': adm.dob || '', 'Gender': adm.gender || '', 'Religion': adm.religion || '',
+                'Nationality': adm.nationality || '', 'Father Name': adm.fatherName || '',
+                'Father CNIC': adm.fatherCnic || '', 'Contact Number': adm.contact || '',
+                'WhatsApp Number': adm.whatsapp || '', 'Address': adm.address || '',
+                'Fee Status': s.fee_status || 'Pending', 'Password': s.password
+            };
+        });
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, selectedClassForList);
+        XLSX.writeFile(wb, `Class_${selectedClassForList}_Roster_${new Date().toISOString().split('T')[0]}.xlsx`);
+        showSaveMessage(`Exported ${classStudents.length} students!`);
+    };
+
     // Common button style for Excel buttons
     const excelBtnStyle = {
         padding: '0.5rem 1rem',
@@ -1372,6 +1533,20 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                 ref={facilityFileRef}
                 onChange={(e) => handleFacilityPhotoUpload(e)}
                 accept="image/*"
+                style={{ display: 'none' }}
+            />
+            <input
+                type="file"
+                ref={blogImageRef}
+                onChange={(e) => handleBlogImageUpload(e)}
+                accept="image/*"
+                style={{ display: 'none' }}
+            />
+            <input
+                type="file"
+                ref={classImportFileRef}
+                onChange={importStudentsExcel}
+                accept=".xlsx,.xls"
                 style={{ display: 'none' }}
             />
 
@@ -1447,8 +1622,10 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                             { id: 'marks', label: 'Student Marks', icon: Award },
                             { id: 'attendance', label: 'Attendance Sheet', icon: Calendar },
                             { id: 'fees', label: 'Fee Status', icon: DollarSign },
+                            { id: 'classes', label: 'Class Lists', icon: Users },
                             { id: 'faculty', label: 'Faculty', icon: Users },
                             { id: 'facilities', label: 'Facilities', icon: Building },
+                            { id: 'blog', label: 'Blog Posts', icon: FileText },
                             { id: 'reports', label: 'Student Reports', icon: FileText },
                             { id: 'admissions', label: 'Admissions', icon: PlusCircle },
                             { id: 'announcements', label: 'Announcements', icon: Megaphone }
@@ -2452,6 +2629,301 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                     </div>
                                 ))}
                             </div>
+                        </div>
+                    )}
+
+                    {/* ========== BLOG TAB ========== */}
+                    {activeTab === 'blog' && (
+                        <div className="animate-fade-in">
+                            <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+                                <h2 style={{ fontSize: '1.75rem', fontWeight: 'var(--font-weight-bold)' }}>Manage Blog Posts</h2>
+                                <button onClick={addBlog} className="btn btn-primary">
+                                    <PlusCircle size={18} /> Add Blog Post
+                                </button>
+                            </div>
+
+                            {editingBlogId && (
+                                <div className="card" style={{ padding: '2rem', marginBottom: '2rem', border: '2px solid var(--color-primary-100)' }}>
+                                    <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1.5rem', color: 'var(--color-primary)' }}>
+                                        {editingBlogId === 'new' ? 'New Blog Post' : 'Edit Blog Post'}
+                                    </h3>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                        <div className="grid grid-cols-2" style={{ gap: '1.5rem' }}>
+                                            <div>
+                                                <label className="form-label">Title *</label>
+                                                <input type="text" className="form-input" value={tempBlog.title} onChange={(e) => setTempBlog({ ...tempBlog, title: e.target.value })} placeholder="Enter blog title" />
+                                            </div>
+                                            <div>
+                                                <label className="form-label">Category</label>
+                                                <select className="form-input" value={tempBlog.category} onChange={(e) => setTempBlog({ ...tempBlog, category: e.target.value })}>
+                                                    <option value="Events">Events</option>
+                                                    <option value="Achievements">Achievements</option>
+                                                    <option value="Campus">Campus</option>
+                                                    <option value="Education">Education</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-3" style={{ gap: '1.5rem' }}>
+                                            <div>
+                                                <label className="form-label">Author</label>
+                                                <input type="text" className="form-input" value={tempBlog.author} onChange={(e) => setTempBlog({ ...tempBlog, author: e.target.value })} />
+                                            </div>
+                                            <div>
+                                                <label className="form-label">Date</label>
+                                                <input type="date" className="form-input" value={tempBlog.date} onChange={(e) => setTempBlog({ ...tempBlog, date: e.target.value })} />
+                                            </div>
+                                            <div>
+                                                <label className="form-label">Read Time</label>
+                                                <input type="text" className="form-input" value={tempBlog.read_time} onChange={(e) => setTempBlog({ ...tempBlog, read_time: e.target.value })} placeholder="e.g., 5 min read" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="form-label">Excerpt *</label>
+                                            <textarea className="form-input" style={{ height: '80px' }} value={tempBlog.excerpt} onChange={(e) => setTempBlog({ ...tempBlog, excerpt: e.target.value })} placeholder="Brief summary of the blog post"></textarea>
+                                        </div>
+                                        <div>
+                                            <label className="form-label">Content *</label>
+                                            <textarea className="form-input" style={{ height: '200px' }} value={tempBlog.content} onChange={(e) => setTempBlog({ ...tempBlog, content: e.target.value })} placeholder="Full blog post content"></textarea>
+                                        </div>
+                                        <div>
+                                            <label className="form-label">Cover Image</label>
+                                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                                {tempBlog?.image && (
+                                                    <div style={{ width: '120px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '2px solid #e2e8f0' }}>
+                                                        <img src={tempBlog.image} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    </div>
+                                                )}
+                                                <button onClick={() => blogImageRef.current.click()} className="btn btn-sm" style={{ background: 'var(--color-primary)', color: 'white' }}>
+                                                    <Camera size={16} /> {tempBlog?.image ? 'Change Image' : 'Upload Image'}
+                                                </button>
+                                                {tempBlog?.image && (
+                                                    <button onClick={() => setTempBlog({ ...tempBlog, image: '' })} className="btn btn-sm" style={{ background: '#fef2f2', color: '#dc2626' }}>
+                                                        Remove Image
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2" style={{ marginTop: '1rem' }}>
+                                            <button onClick={saveBlog} className="btn btn-success" style={{ flex: 1 }}>
+                                                <Save size={18} /> Save Blog Post
+                                            </button>
+                                            <button onClick={() => { setEditingBlogId(null); setTempBlog(null); }} className="btn" style={{ background: '#f1f5f9', color: '#64748b' }}>
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2" style={{ gap: '1.5rem' }}>
+                                {(schoolData.blogs || []).map((blog) => (
+                                    <div key={blog.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                                        {blog.image && (
+                                            <div style={{ height: '180px', width: '100%', position: 'relative' }}>
+                                                <img src={blog.image} alt={blog.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            </div>
+                                        )}
+                                        <div style={{ padding: '1.5rem' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                                                <span style={{ padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 700, background: blog.category === 'Events' ? '#eff6ff' : blog.category === 'Achievements' ? '#fef3c7' : blog.category === 'Campus' ? '#ecfdf5' : '#f5f3ff', color: blog.category === 'Events' ? '#2563eb' : blog.category === 'Achievements' ? '#d97706' : blog.category === 'Campus' ? '#059669' : '#7c3aed' }}>
+                                                    {blog.category}
+                                                </span>
+                                                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{new Date(blog.date).toLocaleDateString()}</span>
+                                            </div>
+                                            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '0.5rem', lineHeight: 1.4 }}>{blog.title}</h3>
+                                            <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '1rem', lineHeight: 1.6 }}>{blog.excerpt}</p>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '1px solid #f1f5f9' }}>
+                                                <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                                                    By {blog.author} • {blog.read_time}
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => { setEditingBlogId(blog.id); setTempBlog(blog); }} className="btn btn-sm btn-icon" style={{ background: '#eff6ff', color: '#2563eb' }}>
+                                                        <Edit3 size={16} />
+                                                    </button>
+                                                    <button onClick={() => deleteBlog(blog.id)} className="btn btn-sm btn-icon" style={{ background: '#fef2f2', color: '#dc2626' }}>
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {(schoolData.blogs || []).length === 0 && !editingBlogId && (
+                                <div style={{ textAlign: 'center', padding: '4rem 0', color: '#94a3b8' }}>
+                                    <FileText size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+                                    <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>No blog posts yet</p>
+                                    <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>Click "Add Blog Post" to create your first post</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ========== CLASS LISTS TAB ========== */}
+                    {activeTab === 'classes' && (
+                        <div className="animate-fade-in">
+                            <div className="flex-between" style={{ marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                                <h2 style={{ fontSize: '1.75rem', fontWeight: 'var(--font-weight-bold)' }}>Class Lists</h2>
+                                <div className="flex gap-2" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <select
+                                        className="form-input"
+                                        style={{ padding: '0.5rem 1rem', minWidth: '180px' }}
+                                        value={selectedClassForList}
+                                        onChange={(e) => setSelectedClassForList(e.target.value)}
+                                    >
+                                        {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2" style={{ marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                                <button onClick={downloadClassTemplate} className="btn" style={{ background: '#10b981', color: 'white', borderColor: '#10b981' }}>
+                                    <Download size={18} /> Download Template
+                                </button>
+                                <button onClick={() => classImportFileRef.current.click()} className="btn" style={{ background: '#3b82f6', color: 'white', borderColor: '#3b82f6' }}>
+                                    <Upload size={18} /> Import Excel
+                                </button>
+                                <button onClick={exportClassRoster} className="btn" style={{ background: '#217346', color: 'white', borderColor: '#217346' }}>
+                                    <Download size={18} /> Export Roster
+                                </button>
+                            </div>
+
+                            {/* Add / Remove Class Panel */}
+                            <div className="card" style={{ padding: '1.25rem', marginBottom: '1.5rem', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                                <h4 style={{ fontWeight: 700, marginBottom: '1rem', fontSize: '1rem' }}>Manage Classes</h4>
+                                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1rem' }}>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="New class name (e.g. Class 11)"
+                                        value={newClassName}
+                                        onChange={(e) => setNewClassName(e.target.value)}
+                                        style={{ maxWidth: '260px' }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && newClassName.trim()) {
+                                                const trimmed = newClassName.trim();
+                                                if (CLASSES.includes(trimmed)) { alert('Class already exists!'); return; }
+                                                const updated = [...CLASSES, trimmed];
+                                                updateClasses(updated);
+                                                setSelectedClassForList(trimmed);
+                                                setNewClassName('');
+                                                showSaveMessage(`Class "${trimmed}" added!`);
+                                            }
+                                        }}
+                                    />
+                                    <button
+                                        className="btn btn-primary"
+                                        onClick={() => {
+                                            const trimmed = newClassName.trim();
+                                            if (!trimmed) return;
+                                            if (CLASSES.includes(trimmed)) { alert('Class already exists!'); return; }
+                                            const updated = [...CLASSES, trimmed];
+                                            updateClasses(updated);
+                                            setSelectedClassForList(trimmed);
+                                            setNewClassName('');
+                                            showSaveMessage(`Class "${trimmed}" added!`);
+                                        }}
+                                    >
+                                        <PlusCircle size={16} /> Add Class
+                                    </button>
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                    {CLASSES.map(cls => {
+                                        const count = students.filter(s => s.grade === cls).length;
+                                        return (
+                                            <div key={cls} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.35rem 0.75rem', borderRadius: '999px', background: selectedClassForList === cls ? 'var(--color-primary)' : '#e2e8f0', color: selectedClassForList === cls ? 'white' : '#374151', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}
+                                                onClick={() => setSelectedClassForList(cls)}>
+                                                {cls} <span style={{ opacity: 0.75 }}>({count})</span>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (!window.confirm(`Delete class "${cls}"? Students in this class will NOT be deleted.`)) return;
+                                                        const updated = CLASSES.filter(c => c !== cls);
+                                                        updateClasses(updated);
+                                                        if (selectedClassForList === cls) setSelectedClassForList(updated[0] || '');
+                                                        showSaveMessage(`Class "${cls}" removed!`);
+                                                    }}
+                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 2px', display: 'flex', alignItems: 'center', color: selectedClassForList === cls ? 'rgba(255,255,255,0.8)' : '#94a3b8' }}
+                                                    title="Remove class"
+                                                >
+                                                    <X size={13} />
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div style={{ marginBottom: '1rem' }}>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="Search students..."
+                                    value={classListSearch}
+                                    onChange={(e) => setClassListSearch(e.target.value)}
+                                    style={{ maxWidth: '300px' }}
+                                />
+                            </div>
+
+                            {(() => {
+                                const classStudents = students.filter(s => s.grade === selectedClassForList &&
+                                    (classListSearch === '' || s.name.toLowerCase().includes(classListSearch.toLowerCase()) ||
+                                        s.id.toLowerCase().includes(classListSearch.toLowerCase())));
+
+                                return classStudents.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '4rem 0', color: '#94a3b8' }}>
+                                        <Users size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+                                        <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>No students in {selectedClassForList}</p>
+                                        <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>Import students using the Excel template</p>
+                                    </div>
+                                ) : (
+                                    <div className="card" style={{ padding: 0, overflow: 'auto' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                            <thead style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                                                <tr>
+                                                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 700, fontSize: '0.85rem', color: '#64748b' }}>Student ID</th>
+                                                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 700, fontSize: '0.85rem', color: '#64748b' }}>Name</th>
+                                                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 700, fontSize: '0.85rem', color: '#64748b' }}>Father Name</th>
+                                                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 700, fontSize: '0.85rem', color: '#64748b' }}>Contact</th>
+                                                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 700, fontSize: '0.85rem', color: '#64748b' }}>Fee Status</th>
+                                                    <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 700, fontSize: '0.85rem', color: '#64748b' }}>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {classStudents.map((student, idx) => {
+                                                    const admission = student.admissions?.[0] || {};
+                                                    return (
+                                                        <tr key={student.id} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? 'white' : '#fafbfc' }}>
+                                                            <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: 600, color: '#2563eb' }}>{student.id}</td>
+                                                            <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: 600 }}>{student.name}</td>
+                                                            <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#64748b' }}>{admission.fatherName || 'N/A'}</td>
+                                                            <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#64748b' }}>{admission.contact || 'N/A'}</td>
+                                                            <td style={{ padding: '1rem' }}>
+                                                                <span style={{
+                                                                    padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 700,
+                                                                    background: student.fee_status === 'Paid' ? '#d1fae5' : student.fee_status === 'Pending' ? '#fef3c7' : '#fee2e2',
+                                                                    color: student.fee_status === 'Paid' ? '#065f46' : student.fee_status === 'Pending' ? '#92400e' : '#991b1b'
+                                                                }}>
+                                                                    {student.fee_status || 'Pending'}
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ padding: '1rem', textAlign: 'center' }}>
+                                                                <button onClick={() => { setSelectedStudent(student); setActiveTab('reports'); }} className="btn btn-sm" style={{ background: '#eff6ff', color: '#2563eb', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
+                                                                    View Details
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                        <div style={{ padding: '1rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
+                                            Total Students: {classStudents.length}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     )}
 

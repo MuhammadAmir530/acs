@@ -24,7 +24,8 @@ export const SchoolDataProvider = ({ children }) => {
         facilities: [],
         students: [],
         announcements: [],
-        testimonials: []
+        testimonials: [],
+        blogs: []
     });
     const [classes, setClasses] = useState(LOCAL_CLASSES);
     const [loading, setLoading] = useState(true);
@@ -54,6 +55,9 @@ export const SchoolDataProvider = ({ children }) => {
             // 7. Get Students
             const { data: students } = await supabase.from('students').select('*');
 
+            // 8. Get Blogs
+            const { data: blogs } = await supabase.from('blogs').select('*').order('date', { ascending: false });
+
             setData(prev => ({
                 ...prev,
                 ...(info || {}),
@@ -61,6 +65,7 @@ export const SchoolDataProvider = ({ children }) => {
                 facilities: facilities || [],
                 testimonials: testimonials || [],
                 announcements: announcements || [],
+                blogs: blogs || [],
                 students: (students || []).map(s => ({
                     ...s,
                     photo: s.image,
@@ -116,6 +121,18 @@ export const SchoolDataProvider = ({ children }) => {
         if (!error) fetchData();
     };
 
+    const setBlogs = async (blogsList) => {
+        const { error } = await supabase.from('blogs').upsert(blogsList);
+        if (!error) fetchData();
+    };
+
+    const updateClasses = async (newClassesList) => {
+        const { error } = await supabase.from('metadata').upsert({ key: 'CLASSES', value: newClassesList });
+        if (!error) {
+            setClasses(newClassesList);
+        }
+    };
+
     return (
         <SchoolDataContext.Provider value={{
             schoolData: data,
@@ -126,7 +143,9 @@ export const SchoolDataProvider = ({ children }) => {
             setFaculty,
             setFacilities,
             setStudents,
-            setAnnouncements
+            setAnnouncements,
+            setBlogs,
+            updateClasses
         }}>
             {children}
         </SchoolDataContext.Provider>

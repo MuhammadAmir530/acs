@@ -5,6 +5,7 @@ DROP TABLE IF EXISTS facilities;
 DROP TABLE IF EXISTS testimonials;
 DROP TABLE IF EXISTS school_info;
 DROP TABLE IF EXISTS metadata;
+DROP TABLE IF EXISTS blogs;
 DROP TABLE IF EXISTS announcements;
 
 -- 1. School Info Table
@@ -74,4 +75,19 @@ CREATE TABLE announcements (
     date TEXT,
     type TEXT,
     active BOOLEAN DEFAULT true
+);
+
+-- 8. Blogs Table
+CREATE TABLE blogs (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    excerpt TEXT,
+    content TEXT,
+    author TEXT DEFAULT 'Admin',
+    date TEXT NOT NULL,
+    category TEXT DEFAULT 'Events',
+    read_time TEXT,
+    image TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );

@@ -1,80 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, User, ArrowRight, Tag, Clock, Search } from 'lucide-react';
 import { useSchoolData } from '../context/SchoolDataContext';
-
-const blogPosts = [
-    {
-        id: 1,
-        title: 'Annual Sports Day 2025: A Grand Celebration of Athletic Excellence',
-        excerpt: 'Our students showcased their athletic prowess in a day filled with exciting competitions, team spirit, and unforgettable moments on the field.',
-        content: 'The Annual Sports Day 2025 was a grand celebration of athletic talent and sportsmanship...',
-        author: 'Admin',
-        date: '2025-12-15',
-        category: 'Events',
-        readTime: '4 min read',
-        image: '🏆'
-    },
-    {
-        id: 2,
-        title: 'ACS Students Achieve Outstanding Results in Board Exams',
-        excerpt: 'We are proud to announce that our students have achieved remarkable results in the 2025 board examinations with a 98% pass rate.',
-        content: 'ACS School & College celebrates the outstanding academic achievements of its students...',
-        author: 'Principal',
-        date: '2025-11-20',
-        category: 'Achievements',
-        readTime: '3 min read',
-        image: '🎓'
-    },
-    {
-        id: 3,
-        title: 'New Science Laboratory Inaugurated with State-of-the-Art Equipment',
-        excerpt: 'Our brand new science laboratory features modern equipment and technology to provide students with hands-on learning experiences.',
-        content: 'ACS School & College is proud to inaugurate its new state-of-the-art science laboratory...',
-        author: 'Admin',
-        date: '2025-10-05',
-        category: 'Campus',
-        readTime: '5 min read',
-        image: '🔬'
-    },
-    {
-        id: 4,
-        title: 'Inter-School Debate Competition: ACS Team Brings Home the Trophy',
-        excerpt: 'Our talented debate team won first place at the regional inter-school debate competition, demonstrating exceptional public speaking skills.',
-        content: 'The ACS debate team has once again proven their mettle by securing first place...',
-        author: 'Admin',
-        date: '2025-09-18',
-        category: 'Achievements',
-        readTime: '3 min read',
-        image: '🎤'
-    },
-    {
-        id: 5,
-        title: 'Parent-Teacher Conference: Building Stronger Partnerships',
-        excerpt: 'The annual parent-teacher conference brought together families and educators to discuss student progress and academic goals for the year.',
-        content: 'ACS School & College hosted its annual Parent-Teacher Conference...',
-        author: 'Principal',
-        date: '2025-08-25',
-        category: 'Events',
-        readTime: '4 min read',
-        image: '🤝'
-    },
-    {
-        id: 6,
-        title: 'Tips for Effective Study Habits: A Guide for Students',
-        excerpt: 'Discover proven study techniques and habits that can help you improve your academic performance and make learning more enjoyable.',
-        content: 'Developing effective study habits is crucial for academic success...',
-        author: 'Admin',
-        date: '2025-07-10',
-        category: 'Education',
-        readTime: '6 min read',
-        image: '📚'
-    }
-];
 
 const categories = ['All', 'Events', 'Achievements', 'Campus', 'Education'];
 
 const Blog = () => {
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
+
     const { schoolData } = useSchoolData();
+    const blogPosts = schoolData.blogs || [];
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedPost, setSelectedPost] = useState(null);
