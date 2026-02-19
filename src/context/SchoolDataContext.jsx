@@ -84,7 +84,8 @@ export const SchoolDataProvider = ({ children }) => {
                     photo: s.image,
                     feeStatus: s.fee_status,
                     previous_results: s.previous_results,
-                    previousResults: s.previous_results // Fallback for camelCase
+                    previousResults: s.previous_results, // Fallback for camelCase
+                    serialNumber: s.serial_number
                 }))
             }));
 
@@ -126,7 +127,8 @@ export const SchoolDataProvider = ({ children }) => {
         const dbStudents = studentsList.map(s => ({
             ...s,
             fee_status: s.feeStatus,
-            previous_results: s.previousResults
+            previous_results: s.previousResults,
+            serial_number: s.serialNumber
         }));
 
         const { error } = await supabase.from('students').upsert(dbStudents);

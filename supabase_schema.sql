@@ -48,8 +48,8 @@ CREATE TABLE testimonials (
 );
 
 -- 5. Students Table
-CREATE TABLE students (
     id TEXT PRIMARY KEY,
+    serial_number TEXT UNIQUE,
     password TEXT NOT NULL,
     name TEXT NOT NULL,
     grade TEXT,
