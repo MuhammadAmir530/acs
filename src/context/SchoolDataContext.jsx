@@ -2,6 +2,13 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { CLASSES as LOCAL_CLASSES } from '../data/schoolData';
 
+const DEFAULT_SUBJECTS = ['Urdu', 'English', 'Mathematics', 'Science', 'Social Studies', 'Islamiyat', 'Computer'];
+const DEFAULT_TERMS = ['Term 1', 'Term 2', 'Final Exam'];
+// SUBJECT_TOTALS stored as WEIGHTS key: { subject: totalMarks } e.g. { "Mathematics": 100, "Physics": 85 }
+// If a subject has no entry, falls back to DEFAULT_SUBJECT_TOTAL (100).
+const DEFAULT_WEIGHTS = {};
+const DEFAULT_SUBJECT_TOTAL = 100;
+
 const SchoolDataContext = createContext();
 
 export const useSchoolData = () => {
@@ -28,6 +35,10 @@ export const SchoolDataProvider = ({ children }) => {
         blogs: []
     });
     const [classes, setClasses] = useState(LOCAL_CLASSES);
+    const [subjects, setSubjects] = useState(DEFAULT_SUBJECTS);
+    const [terms, setTerms] = useState(DEFAULT_TERMS);
+    const [sections, setSections] = useState([]); // New state for sections
+    const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
     const [loading, setLoading] = useState(true);
 
     const fetchData = async () => {
@@ -46,8 +57,10 @@ export const SchoolDataProvider = ({ children }) => {
             // 4. Get Testimonials
             const { data: testimonials } = await supabase.from('testimonials').select('*');
 
-            // 5. Get Metadata (Classes)
-            const { data: meta } = await supabase.from('metadata').select('*').eq('key', 'CLASSES').single();
+            // 5. Get Metadata
+            const { data: metaRows } = await supabase.from('metadata').select('*');
+            const metaMap = {};
+            (metaRows || []).forEach(r => { metaMap[r.key] = r.value; });
 
             // 6. Get Announcements
             const { data: announcements } = await supabase.from('announcements').select('*').order('id', { ascending: false });
@@ -75,7 +88,11 @@ export const SchoolDataProvider = ({ children }) => {
                 }))
             }));
 
-            if (meta) setClasses(meta.value);
+            if (metaMap['CLASSES']) setClasses(metaMap['CLASSES']);
+            if (metaMap['SUBJECTS']) setSubjects(metaMap['SUBJECTS']);
+            if (metaMap['TERMS']) setTerms(metaMap['TERMS']);
+            if (metaMap['SECTIONS']) setSections(metaMap['SECTIONS']); // Load SECTIONS
+            if (metaMap['WEIGHTS']) setWeights(metaMap['WEIGHTS']);
 
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -128,15 +145,41 @@ export const SchoolDataProvider = ({ children }) => {
 
     const updateClasses = async (newClassesList) => {
         const { error } = await supabase.from('metadata').upsert({ key: 'CLASSES', value: newClassesList });
+        if (!error) setClasses(newClassesList);
+    };
+
+    const updateSubjects = async (newSubjectsList) => {
+        const { error } = await supabase.from('metadata').upsert({ key: 'SUBJECTS', value: newSubjectsList });
+        if (!error) setSubjects(newSubjectsList);
+    };
+
+    const updateTerms = async (newTermsList) => {
+        const { error } = await supabase.from('metadata').upsert({ key: 'TERMS', value: newTermsList });
+        if (!error) setTerms(newTermsList);
+    };
+
+    const updateSections = async (newSectionsList) => {
+        const { error } = await supabase.from('metadata').upsert({ key: 'SECTIONS', value: newSectionsList });
         if (!error) {
-            setClasses(newClassesList);
+            setSections(newSectionsList);
+            // fetchData(); // Optional: ensure sync
         }
+        return { error };
+    };
+
+    const updateWeights = async (newWeights) => {
+        const { error } = await supabase.from('metadata').upsert({ key: 'WEIGHTS', value: newWeights });
+        if (!error) setWeights(newWeights);
     };
 
     return (
         <SchoolDataContext.Provider value={{
             schoolData: data,
             CLASSES: classes,
+            SUBJECTS: subjects,
+            TERMS: terms,
+            SECTIONS: sections,
+            WEIGHTS: weights,
             loading,
             fetchData,
             updateSchoolInfo,
@@ -145,7 +188,11 @@ export const SchoolDataProvider = ({ children }) => {
             setStudents,
             setAnnouncements,
             setBlogs,
-            updateClasses
+            updateClasses,
+            updateSubjects,
+            updateTerms,
+            updateSections,
+            updateWeights
         }}>
             {children}
         </SchoolDataContext.Provider>

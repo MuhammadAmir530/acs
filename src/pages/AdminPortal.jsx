@@ -11,130 +11,263 @@ import { useSchoolData } from '../context/SchoolDataContext';
 import { supabase } from '../supabaseClient';
 
 const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
-    const { schoolData, CLASSES, fetchData, setStudents, setFaculty, updateSchoolInfo, setAnnouncements, updateClasses } = useSchoolData();
-    const [activeTab, setActiveTab] = useState('marks');
-    const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', date: new Date().toISOString().split('T')[0] });
-    const [selectedStudent, setSelectedStudent] = useState(null);
-    const [editingMarks, setEditingMarks] = useState(false);
-    const [tempMarks, setTempMarks] = useState([]);
+    const { schoolData, CLASSES, SUBJECTS, TERMS, SECTIONS, WEIGHTS, fetchData, setStudents, setFaculty, updateSchoolInfo, setAnnouncements, updateClasses, updateSubjects, updateTerms, updateSections, updateWeights } = useSchoolData();
+    const [activeTab, setActiveTab] = useState('admissions');
     const [saveMessage, setSaveMessage] = useState('');
-    const [reportSearch, setReportSearch] = useState('');
     const [selectedClass, setSelectedClass] = useState(CLASSES[0]);
-    const [assessmentName, setAssessmentName] = useState('');
-    const [assessmentSubjects, setAssessmentSubjects] = useState([]); // [{ name: 'Math', total: 100 }, ...]
-    const [newSubjectName, setNewSubjectName] = useState('');
-    const [newSubjectTotal, setNewSubjectTotal] = useState(100);
-    const [selectedAssessmentIndex, setSelectedAssessmentIndex] = useState(-1); // -1 for active, others for history
+    const [reportSearch, setReportSearch] = useState('');
 
-    // Admission Form State
-    const admissionInitialState = {
-        applyingFor: CLASSES[0],
-        applicationDate: new Date().toISOString().split('T')[0],
-        studentName: '',
-        bForm: '',
-        dob: '',
-        nationality: '',
-        gender: '',
-        religion: '',
-        allergies: 'No',
-        allergiesDetails: '',
-        chronicCondition: 'No',
-        chronicConditionDetails: '',
-        medication: 'No',
-        medicationDetails: '',
-        fatherName: '',
-        fatherCnic: '',
-        contact: '',
-        whatsapp: '',
-        address: '',
-        docs: {
-            photos: false,
-            bform: false,
-            cnic: false
-        },
-        photo: ''
+    // ── Gradebook State ──
+    // ── Class Management State ──
+    const [selectedSectionId, setSelectedSectionId] = useState(null);
+    const [viewingClass, setViewingClass] = useState(null);
+    const [classDetailTab, setClassDetailTab] = useState('boys'); // 'boys', 'girls', 'all'
+    const [newSectionName, setNewSectionName] = useState('');
+
+    // Initialize selected section
+    useEffect(() => {
+        if (!selectedSectionId && SECTIONS && SECTIONS.length > 0) {
+            setSelectedSectionId(SECTIONS[0].id);
+        }
+    }, [SECTIONS, selectedSectionId]);
+
+    // ── Gradebook State ──
+    const [gbTerm, setGbTerm] = useState('');
+    const [gbEdits, setGbEdits] = useState({});       // { studentId: { subject: obtained } }
+    const [gbSaving, setGbSaving] = useState(false);
+    const [showGbStats, setShowGbStats] = useState(true);
+    const [newSubjectInput, setNewSubjectInput] = useState('');
+    const [newTermInput, setNewTermInput] = useState('');
+    const [showGbSettings, setShowGbSettings] = useState(false);
+
+    // Helper: get total marks for a subject (from WEIGHTS map, fallback 100)
+    const getSubjectTotal = (sub) => Number(WEIGHTS[sub]) || 100;
+
+    // ── Overall Percentage Calculation ──
+    // Uses per-subject totals from WEIGHTS: sum(obtained) / sum(totals) × 100
+    // Falls back to 100 per subject if not configured.
+    const calcOverallPct = (results) => {
+        if (!results || results.length === 0) return 0;
+        let totalObtained = 0, totalMax = 0;
+        results.forEach(r => {
+            const subTotal = getSubjectTotal(r.subject);
+            const obtained = r.obtained !== undefined ? r.obtained : Math.round((r.percentage / 100) * subTotal);
+            totalObtained += obtained;
+            totalMax += subTotal;
+        });
+        return totalMax > 0 ? Math.round((totalObtained / totalMax) * 100) : 0;
     };
-    const [admissionData, setAdmissionData] = useState(admissionInitialState);
 
-    const addNewAssessment = () => {
-        if (!assessmentName.trim()) {
-            alert('Please enter an assessment name first.');
-            return;
-        }
+    // Alias for backward compat in export functions
+    const calcWeightedAvg = calcOverallPct;
 
-        if (assessmentSubjects.length === 0) {
-            alert('Please add at least one subject to the assessment.');
-            return;
-        }
+    // ── Grade Calculation (Pakistani Scale) ──
+    const calcGrade = (pct) => {
+        if (pct >= 90) return 'A+';
+        if (pct >= 80) return 'A';
+        if (pct >= 70) return 'B+';
+        if (pct >= 60) return 'B';
+        if (pct >= 50) return 'C';
+        if (pct >= 40) return 'D';
+        return 'F';
+    };
 
+    const gradeColor = (pct) => {
+        if (pct >= 80) return { bg: '#dcfce7', text: '#15803d' };
+        if (pct >= 60) return { bg: '#dbeafe', text: '#1d4ed8' };
+        if (pct >= 50) return { bg: '#fef9c3', text: '#a16207' };
+        if (pct >= 40) return { bg: '#ffedd5', text: '#c2410c' };
+        return { bg: '#fee2e2', text: '#dc2626' };
+    };
+
+    // Get the obtained value for a student/subject from edits or saved data
+    const getCellValue = (student, subject) => {
+        if (gbEdits[student.id] && gbEdits[student.id][subject] !== undefined)
+            return gbEdits[student.id][subject];
+        const r = (student.results || []).find(r => r.subject === subject);
+        return r ? (r.obtained !== undefined ? r.obtained : '') : '';
+    };
+
+    const handleCellEdit = (studentId, subject, value) => {
+        setGbEdits(prev => ({
+            ...prev,
+            [studentId]: { ...(prev[studentId] || {}), [subject]: value === '' ? '' : Number(value) }
+        }));
+    };
+
+    const saveGradebook = async () => {
+        if (Object.keys(gbEdits).length === 0) { showSaveMessage('No changes to save.'); return; }
+        setGbSaving(true);
+        const termLabel = gbTerm || 'Current';
+        const classStudents = students.filter(s => s.grade === selectedClass);
+        const updatedStudents = classStudents.map(s => {
+            if (!gbEdits[s.id]) return s;
+            const newResults = SUBJECTS.map(subject => {
+                const subTotal = getSubjectTotal(subject);
+                const obtained = gbEdits[s.id]?.[subject] !== undefined
+                    ? Number(gbEdits[s.id][subject])
+                    : ((s.results || []).find(r => r.subject === subject)?.obtained ?? 0);
+                const pct = Math.round((obtained / subTotal) * 100);
+                const existing = (s.results || []).find(r => r.subject === subject);
+                return { subject, total: subTotal, obtained, percentage: pct, grade: calcGrade(pct), remarks: existing?.remarks || '', term: termLabel };
+            });
+            return { ...s, results: newResults };
+        });
+        const allStudents = students.map(s => updatedStudents.find(u => u.id === s.id) || s);
+        await setStudents(allStudents);
+        setGbEdits({});
+        setGbSaving(false);
+        showSaveMessage('Gradebook saved!');
+    };
+
+    const saveRemarks = async (studentId, subject, remarks) => {
         const updatedStudents = students.map(s => {
-            if (s.grade === selectedClass) {
-                // Archive existing results
-                const historyEntry = {
-                    term: assessmentName,
-                    results: [...s.results]
-                };
+            if (s.id !== studentId) return s;
+            const newResults = (s.results || []).map(r =>
+                r.subject === subject ? { ...r, remarks } : r
+            );
+            return { ...s, results: newResults };
+        });
+        await setStudents(updatedStudents);
+    };
 
-                // Create new blank results based on defined subjects
-                const newResults = assessmentSubjects.map(sub => ({
-                    subject: sub.name,
-                    total: sub.total,
-                    obtained: 0,
-                    percentage: 0,
-                    grade: 'F'
-                }));
+    const archiveTerm = async () => {
+        const termLabel = gbTerm || TERMS[0];
+        if (!window.confirm(`Archive current marks as "${termLabel}" for ${selectedClass}? This will move current results to history.`)) return;
+        const classStudents = students.filter(s => s.grade === selectedClass);
+        const updatedStudents = classStudents.map(s => {
+            const historyEntry = { term: termLabel, results: [...(s.results || [])] };
+            return {
+                ...s,
+                previousResults: [...(s.previousResults || []), historyEntry],
+                results: SUBJECTS.map(subject => ({ subject, total: getSubjectTotal(subject), obtained: 0, percentage: 0, grade: 'F', remarks: '' }))
+            };
+        });
+        const allStudents = students.map(s => updatedStudents.find(u => u.id === s.id) || s);
+        await setStudents(allStudents);
+        showSaveMessage(`Term "${termLabel}" archived!`);
+    };
 
-                return {
-                    ...s,
-                    previousResults: [...(s.previousResults || []), historyEntry],
-                    results: newResults
-                };
-            }
-            return s;
+    // ── Cumulative Excel Export ──
+    // Exports one workbook with:
+    //   - One sheet per archived term (from previousResults)
+    //   - One "Current" sheet for active results
+    //   - One "Summary" sheet showing all terms side-by-side
+    const exportGradebookExcel = () => {
+        const classStudents = students.filter(s => s.grade === selectedClass);
+        const wb = XLSX.utils.book_new();
+
+        // Collect all term names (archived + current)
+        const archivedTermNames = [];
+        classStudents.forEach(s => {
+            (s.previousResults || []).forEach(h => {
+                if (!archivedTermNames.includes(h.term)) archivedTermNames.push(h.term);
+            });
         });
 
-        setStudents(updatedStudents);
-        showSaveMessage(`Assessment "${assessmentName}" with ${assessmentSubjects.length} subjects archived!`);
+        const buildSheet = (termResults) => {
+            // termResults: { studentId -> results[] }
+            return classStudents.map(s => {
+                const results = termResults[s.id] || [];
+                const row = { 'Student ID': s.id, 'Student Name': s.name };
+                SUBJECTS.forEach(sub => {
+                    const r = results.find(r => r.subject === sub);
+                    row[`${sub} (Marks)`] = r ? r.obtained : '';
+                    row[`${sub} (%)`] = r ? r.percentage : '';
+                    row[`${sub} (Grade)`] = r ? r.grade : '';
+                    if (WEIGHTS[sub]) row[`${sub} (Weight%)`] = WEIGHTS[sub];
+                });
+                const avg = results.length ? calcWeightedAvg(results) : '';
+                row['Weighted Avg %'] = avg;
+                row['Overall Grade'] = avg !== '' ? calcGrade(avg) : '';
+                return row;
+            });
+        };
+
+        // Sheet per archived term
+        archivedTermNames.forEach(termName => {
+            const termResults = {};
+            classStudents.forEach(s => {
+                const hist = (s.previousResults || []).find(h => h.term === termName);
+                termResults[s.id] = hist ? hist.results : [];
+            });
+            const ws = XLSX.utils.json_to_sheet(buildSheet(termResults));
+            XLSX.utils.book_append_sheet(wb, ws, termName.substring(0, 31));
+        });
+
+        // Current term sheet
+        const currentResults = {};
+        classStudents.forEach(s => { currentResults[s.id] = s.results || []; });
+        const currentLabel = gbTerm || 'Current';
+        const wsCurrent = XLSX.utils.json_to_sheet(buildSheet(currentResults));
+        XLSX.utils.book_append_sheet(wb, wsCurrent, currentLabel.substring(0, 31));
+
+        // Summary sheet: student | Term1 Avg | Term2 Avg | ... | Current Avg | Overall
+        const allTermNames = [...archivedTermNames, currentLabel];
+        const summaryRows = classStudents.map(s => {
+            const row = { 'Student ID': s.id, 'Student Name': s.name };
+            archivedTermNames.forEach(termName => {
+                const hist = (s.previousResults || []).find(h => h.term === termName);
+                const res = hist ? hist.results : [];
+                row[`${termName} Avg%`] = res.length ? calcWeightedAvg(res) : '';
+                row[`${termName} Grade`] = res.length ? calcGrade(calcWeightedAvg(res)) : '';
+            });
+            const curRes = s.results || [];
+            row[`${currentLabel} Avg%`] = curRes.length ? calcWeightedAvg(curRes) : '';
+            row[`${currentLabel} Grade`] = curRes.length ? calcGrade(calcWeightedAvg(curRes)) : '';
+            // Grand average across all terms
+            const allAvgs = allTermNames.map(t => {
+                if (t === currentLabel) return curRes.length ? calcWeightedAvg(curRes) : null;
+                const hist = (s.previousResults || []).find(h => h.term === t);
+                return hist && hist.results.length ? calcWeightedAvg(hist.results) : null;
+            }).filter(v => v !== null);
+            row['Grand Avg%'] = allAvgs.length ? Math.round(allAvgs.reduce((a, b) => a + b, 0) / allAvgs.length) : '';
+            row['Grand Grade'] = row['Grand Avg%'] !== '' ? calcGrade(row['Grand Avg%']) : '';
+            return row;
+        });
+        const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+        XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+
+        XLSX.writeFile(wb, `Gradebook_${selectedClass}_AllTerms.xlsx`);
     };
 
-    const addAndDownloadTemplate = () => {
-        if (!assessmentName.trim()) {
-            alert('Please enter an assessment name first.');
-            return;
-        }
-
-        if (assessmentSubjects.length === 0) {
-            alert('Please add at least one subject first.');
-            return;
-        }
-
-        const currentName = assessmentName;
-        const currentSubjects = [...assessmentSubjects];
-
-        addNewAssessment();
-
-        setTimeout(() => {
-            exportMarksExcel(currentName, currentSubjects);
-            setAssessmentName('');
-            setAssessmentSubjects([]);
-        }, 100);
+    const importGradebookExcel = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const wb = XLSX.read(evt.target.result, { type: 'binary' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws);
+            const newEdits = {};
+            rows.forEach(row => {
+                const studentId = row['Student ID'];
+                if (!studentId) return;
+                newEdits[studentId] = {};
+                SUBJECTS.forEach(sub => {
+                    if (row[sub] !== undefined) newEdits[studentId][sub] = Number(row[sub]);
+                });
+            });
+            setGbEdits(newEdits);
+            showSaveMessage(`Imported marks for ${Object.keys(newEdits).length} students. Click Save All to apply.`);
+        };
+        reader.readAsBinaryString(file);
+        e.target.value = '';
     };
 
-    const addSubjectToAssessment = () => {
-        if (!newSubjectName.trim()) return;
-        setAssessmentSubjects([...assessmentSubjects, { name: newSubjectName.trim(), total: newSubjectTotal }]);
-        setNewSubjectName('');
+    const downloadGradebookTemplate = () => {
+        const classStudents = students.filter(s => s.grade === selectedClass);
+        const rows = classStudents.map(s => {
+            const row = { 'Student ID': s.id, 'Student Name': s.name };
+            SUBJECTS.forEach(sub => { row[sub] = ''; });
+            return row;
+        });
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Marks Template');
+        XLSX.writeFile(wb, `Marks_Template_${selectedClass}.xlsx`);
     };
 
-    const removeSubjectFromAssessment = (index) => {
-        setAssessmentSubjects(assessmentSubjects.filter((_, i) => i !== index));
-    };
-
-    const loadAssessment = (index) => {
-        setSelectedAssessmentIndex(index);
-        setEditingMarks(false);
-        setSelectedStudent(null);
-    };
 
     // File refs
     const attendanceFileRef = useRef(null);
@@ -144,6 +277,21 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     const facultyFileRef = useRef(null);
     const facilityFileRef = useRef(null);
     const blogImageRef = useRef(null);
+    const gbImportFileRef = useRef(null);
+
+    // Announcement state
+    const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', date: new Date().toISOString().split('T')[0] });
+
+    // Admission Form State
+    const admissionInitialState = {
+        applyingFor: CLASSES[0], applicationDate: new Date().toISOString().split('T')[0],
+        studentName: '', bForm: '', dob: '', nationality: '', gender: '', religion: '',
+        allergies: 'No', allergiesDetails: '', chronicCondition: 'No', chronicConditionDetails: '',
+        medication: 'No', medicationDetails: '', fatherName: '', fatherCnic: '',
+        contact: '', whatsapp: '', address: '', docs: { photos: false, bform: false, cnic: false }, photo: ''
+    };
+    const [admissionData, setAdmissionData] = useState(admissionInitialState);
+    const [selectedStudent, setSelectedStudent] = useState(null);
 
     const [editingFacultyId, setEditingFacultyId] = useState(null);
     const [editingFacilityId, setEditingFacilityId] = useState(null);
@@ -1619,16 +1767,16 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                         padding: '0.5rem 0'
                     }}>
                         {[
+                            { id: 'admissions', label: 'Admissions', icon: PlusCircle },
                             { id: 'marks', label: 'Student Marks', icon: Award },
+                            { id: 'reports', label: 'Student Reports', icon: FileText },
                             { id: 'attendance', label: 'Attendance Sheet', icon: Calendar },
                             { id: 'fees', label: 'Fee Status', icon: DollarSign },
                             { id: 'classes', label: 'Class Lists', icon: Users },
+                            { id: 'announcements', label: 'Announcements', icon: Megaphone },
                             { id: 'faculty', label: 'Faculty', icon: Users },
                             { id: 'facilities', label: 'Facilities', icon: Building },
-                            { id: 'blog', label: 'Blog Posts', icon: FileText },
-                            { id: 'reports', label: 'Student Reports', icon: FileText },
-                            { id: 'admissions', label: 'Admissions', icon: PlusCircle },
-                            { id: 'announcements', label: 'Announcements', icon: Megaphone }
+                            { id: 'blog', label: 'Blog Posts', icon: FileText }
                         ].map((tab) => (
                             <button
                                 key={tab.id}
@@ -1659,319 +1807,338 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
             <section className="section">
                 <div className="container">
 
-                    {/* ========== MARKS TAB ========== */}
-                    {activeTab === 'marks' && (
-                        <div className="animate-fade-in">
-                            <div className="flex-between" style={{ marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                                <h2 style={{
-                                    fontSize: '1.75rem',
-                                    fontWeight: 'var(--font-weight-bold)'
-                                }}>
-                                    Student Marks
-                                </h2>
-                                <div className="flex gap-4" style={{ alignItems: 'center' }}>
-                                    <div className="flex gap-2" style={{ alignItems: 'center' }}>
-                                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-gray-500)' }}>Filter Class:</span>
-                                        <select
-                                            className="form-input"
-                                            style={{ padding: '0.4rem 0.8rem', minWidth: '180px' }}
-                                            value={selectedClass}
-                                            onChange={(e) => {
-                                                setSelectedClass(e.target.value);
-                                                setSelectedStudent(null);
-                                                setEditingMarks(false);
-                                            }}
-                                        >
-                                            {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="flex gap-2" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                                        <button
-                                            onClick={exportMarksExcel}
-                                            style={{
-                                                ...excelBtnStyle,
-                                                background: '#217346',
-                                                color: 'white',
-                                                borderColor: '#217346'
-                                            }}
-                                        >
-                                            <Download size={16} /> Export Excel
-                                        </button>
-                                        <button
-                                            onClick={() => marksFileRef.current.click()}
-                                            style={{
-                                                ...excelBtnStyle,
-                                                background: 'white',
-                                                color: '#217346',
-                                                borderColor: '#217346'
-                                            }}
-                                        >
-                                            <Upload size={16} /> Import Excel
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex flex-col gap-4" style={{ marginTop: '1rem', background: 'var(--color-gray-50)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-gray-200)' }}>
-                                <div className="flex gap-4 flex-wrap items-center">
-                                    <div className="flex gap-2" style={{ alignItems: 'center' }}>
-                                        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Assessment Name:</span>
-                                        <input
-                                            type="text"
-                                            className="form-input"
-                                            style={{ padding: '0.4rem 0.8rem', minWidth: '220px' }}
-                                            placeholder="e.g. Term 1 - 2024"
-                                            value={assessmentName}
-                                            onChange={(e) => setAssessmentName(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="flex gap-2 items-center" style={{ borderLeft: '1px solid var(--color-gray-200)', paddingLeft: '1rem' }}>
-                                        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Add Subject:</span>
-                                        <input
-                                            type="text"
-                                            className="form-input"
-                                            style={{ padding: '0.4rem 0.8rem', width: '150px' }}
-                                            placeholder="Math"
-                                            value={newSubjectName}
-                                            onChange={(e) => setNewSubjectName(e.target.value)}
-                                        />
-                                        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Total:</span>
-                                        <input
-                                            type="number"
-                                            className="form-input"
-                                            style={{ padding: '0.4rem 0.8rem', width: '80px' }}
-                                            value={newSubjectTotal}
-                                            onChange={(e) => setNewSubjectTotal(parseInt(e.target.value) || 0)}
-                                        />
-                                        <button
-                                            onClick={addSubjectToAssessment}
-                                            className="btn btn-secondary btn-sm"
-                                            style={{ height: '36px', padding: '0 1rem' }}
-                                        >
-                                            Add Subject
-                                        </button>
-                                    </div>
-                                </div>
+                    {/* ========== GRADEBOOK TAB ========== */}
+                    {activeTab === 'marks' && (() => {
+                        const classStudents = students.filter(s => s.grade === selectedClass);
+                        // Compute stats
+                        // Compute stats
+                        const subjectStats = SUBJECTS.map(sub => {
+                            const subTotal = getSubjectTotal(sub);
+                            const vals = classStudents.map(s => {
+                                const r = (s.results || []).find(r => r.subject === sub);
+                                const edited = gbEdits[s.id]?.[sub];
+                                const obtained = edited !== undefined ? Number(edited) : (r?.obtained ?? null);
+                                return obtained !== null ? Math.round((obtained / subTotal) * 100) : null;
+                            }).filter(v => v !== null);
+                            const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+                            const high = vals.length ? Math.max(...vals) : 0;
+                            const pass = vals.filter(v => v >= 40).length;
+                            return { sub, avg, high, pass, total: vals.length };
+                        });
+                        const overallAvg = classStudents.length ? Math.round(
+                            classStudents.reduce((sum, s) => {
+                                const res = s.results || [];
+                                const pct = calcOverallPct(res);
+                                return sum + pct;
+                            }, 0) / classStudents.length
+                        ) : 0;
+                        const passCount = classStudents.filter(s => {
+                            const res = s.results || [];
+                            const pct = calcOverallPct(res);
+                            return pct >= 40;
+                        }).length;
 
-                                {/* Subject List */}
-                                {assessmentSubjects.length > 0 && (
-                                    <div className="flex gap-2 flex-wrap" style={{ marginTop: '0.5rem' }}>
-                                        {assessmentSubjects.map((sub, idx) => (
-                                            <div key={idx} style={{
-                                                background: 'white',
-                                                border: '1px solid var(--color-gray-300)',
-                                                borderRadius: '999px',
-                                                padding: '0.2rem 0.8rem',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '0.5rem',
-                                                fontSize: '0.85rem'
-                                            }}>
-                                                <span style={{ fontWeight: 700 }}>{sub.name}</span>
-                                                <span style={{ color: 'var(--color-gray-500)', fontSize: '0.75rem' }}>({sub.total} Marks)</span>
-                                                <button
-                                                    onClick={() => removeSubjectFromAssessment(idx)}
-                                                    style={{ color: 'var(--color-danger)', cursor: 'pointer', padding: '0 2px' }}
-                                                >
-                                                    <XCircle size={14} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                        return (
+                            <div className="animate-fade-in">
+                                {/* Hidden import input */}
+                                <input type="file" ref={gbImportFileRef} onChange={importGradebookExcel} accept=".xlsx,.xls" style={{ display: 'none' }} />
 
-                                <div className="flex gap-3" style={{ marginTop: '0.5rem', borderTop: '1px solid var(--color-gray-200)', paddingTop: '1rem' }}>
-                                    <button
-                                        onClick={addNewAssessment}
-                                        className="btn btn-secondary"
-                                        style={{ flex: 1, padding: '0.6rem' }}
-                                    >
-                                        <Save size={18} /> Archive Current Results
-                                    </button>
-                                    <button
-                                        onClick={addAndDownloadTemplate}
-                                        className="btn btn-primary"
-                                        style={{ flex: 2, padding: '0.6rem' }}
-                                    >
-                                        <Download size={18} /> Create Assessment & Download Excel Template
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem', borderBottom: '1px solid var(--color-gray-200)', paddingBottom: '1.5rem' }}>
-                                <div className="flex gap-2" style={{ alignItems: 'center' }}>
-                                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-primary)' }}>View Session:</span>
-                                    <select
-                                        className="form-input"
-                                        style={{ padding: '0.4rem 0.8rem', minWidth: '180px', borderColor: 'var(--color-primary)' }}
-                                        value={selectedAssessmentIndex}
-                                        onChange={(e) => loadAssessment(parseInt(e.target.value))}
-                                    >
-                                        <option value="-1">Current Active Session</option>
-                                        {students.find(s => s.grade === selectedClass)?.previousResults?.map((res, idx) => (
-                                            <option key={idx} value={idx}>{res.term}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="flex gap-2" style={{ alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                                <select
-                                    value={selectedStudent || ''}
-                                    onChange={(e) => {
-                                        setSelectedStudent(e.target.value || null);
-                                        setEditingMarks(false);
-                                    }}
-                                    className="form-input"
-                                    style={{ minWidth: '220px' }}
-                                >
-                                    <option value="">Select Student...</option>
-                                    {students.filter(s => s.grade === selectedClass).map(s => (
-                                        <option key={s.id} value={s.id}>
-                                            {s.name} ({s.id})
-                                        </option>
-                                    ))}
-                                </select>
-                                {selectedStudent && !editingMarks && (
-                                    <>
-                                        <button onClick={startEditingMarks} className="btn btn-primary btn-sm">
-                                            <Edit3 size={16} /> Edit Marks
-                                        </button>
-                                        <button onClick={() => downloadStudentReport(selectedStudent)} className="btn btn-sm" style={{ background: '#7c3aed', color: 'white' }}>
-                                            <FileText size={16} /> Download Report
-                                        </button>
-                                        <button
-                                            onClick={() => photoFileRef.current.click()}
-                                            className="btn btn-sm"
-                                            style={{ background: '#0891b2', color: 'white' }}
-                                        >
-                                            <Camera size={16} /> Update Photo
-                                        </button>
-                                    </>
-                                )}
-                                {editingMarks && (
-                                    <button onClick={saveMarks} className="btn btn-primary btn-sm">
-                                        <Save size={16} /> Save
-                                    </button>
-                                )}
-                            </div>
-
-                            {selectedStudent && (
-                                <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                    <div style={{
-                                        width: '60px', height: '60px', borderRadius: '50%', overflow: 'hidden',
-                                        background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                    }}>
-                                        {selectedAssessmentIndex === -1 ? (
-                                            students.find(s => s.id === selectedStudent)?.photo ? (
-                                                <img
-                                                    src={students.find(s => s.id === selectedStudent).photo}
-                                                    alt="Student"
-                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                />
-                                            ) : (
-                                                <User size={30} color="#94a3b8" />
-                                            )
-                                        ) : (
-                                            <Award size={30} color="var(--color-primary)" />
-                                        )}
-                                    </div>
+                                {/* ── Header Bar ── */}
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginBottom: '1.25rem' }}>
                                     <div>
-                                        <div style={{ fontWeight: 'bold' }}>
-                                            {students.find(s => s.id === selectedStudent).name}
-                                            {selectedAssessmentIndex !== -1 && (
-                                                <span style={{ marginLeft: '1rem', padding: '2px 8px', background: 'var(--color-primary-50)', color: 'var(--color-primary)', borderRadius: '12px', fontSize: '0.75rem' }}>
-                                                    Historical: {students.find(s => s.id === selectedStudent).previousResults[selectedAssessmentIndex].term}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                            {selectedAssessmentIndex === -1 ? 'Current Session' : 'Locked History'}
-                                        </div>
+                                        <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>📊 Gradebook</h2>
+                                        <p style={{ color: '#64748b', fontSize: '0.85rem', margin: 0 }}>Spreadsheet-style marks entry for the whole class</p>
+                                    </div>
+                                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                                        {/* Class */}
+                                        <select className="form-input" style={{ padding: '0.4rem 0.75rem' }} value={selectedClass}
+                                            onChange={e => { setSelectedClass(e.target.value); setGbEdits({}); }}>
+                                            {CLASSES.map(c => <option key={c}>{c}</option>)}
+                                        </select>
+                                        {/* Term label */}
+                                        <select className="form-input" style={{ padding: '0.4rem 0.75rem' }} value={gbTerm}
+                                            onChange={e => setGbTerm(e.target.value)}>
+                                            <option value="">Current (Unsaved)</option>
+                                            {TERMS.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+
+                                        <button onClick={saveGradebook} disabled={gbSaving} className="btn btn-primary" style={{ padding: '0.45rem 1rem' }}>
+                                            <Save size={15} /> {gbSaving ? 'Saving…' : 'Save All'}
+                                        </button>
+                                        <button onClick={downloadGradebookTemplate} className="btn" style={{ background: '#10b981', color: 'white', borderColor: '#10b981', padding: '0.45rem 0.9rem' }}>
+                                            <Download size={15} /> Template
+                                        </button>
+                                        <button onClick={() => gbImportFileRef.current.click()} className="btn" style={{ background: '#3b82f6', color: 'white', borderColor: '#3b82f6', padding: '0.45rem 0.9rem' }}>
+                                            <Upload size={15} /> Import
+                                        </button>
+                                        <button onClick={exportGradebookExcel} className="btn" style={{ background: '#217346', color: 'white', borderColor: '#217346', padding: '0.45rem 0.9rem' }}>
+                                            <Download size={15} /> Export All Terms
+                                        </button>
+                                        <button onClick={archiveTerm} className="btn" style={{ background: '#7c3aed', color: 'white', borderColor: '#7c3aed', padding: '0.45rem 0.9rem' }}>
+                                            <Save size={15} /> Archive Term
+                                        </button>
+                                        <button onClick={() => setShowGbSettings(s => !s)} className="btn" style={{ padding: '0.45rem 0.9rem' }}>
+                                            ⚙️ Settings
+                                        </button>
                                     </div>
                                 </div>
-                            )}
 
-                            {!selectedStudent ? (
-                                <div className="card" style={{
-                                    textAlign: 'center',
-                                    padding: '3rem',
-                                    color: 'var(--color-gray-500)'
-                                }}>
-                                    <Users size={48} style={{ margin: '0 auto 1rem', color: 'var(--color-gray-400)' }} />
-                                    <p style={{ fontSize: '1.125rem' }}>Select a student to view or edit marks</p>
-                                </div>
-                            ) : (
-                                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                                    {selectedAssessmentIndex !== -1 && (
-                                        <div style={{ padding: '1rem', background: '#fef9c3', borderBottom: '1px solid #fef08a', color: '#854d0e', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <Lock size={16} /> Viewing historical data. Archive sessions to save current work.
+                                {/* ── Settings Panel ── */}
+                                {showGbSettings && (
+                                    <div className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                                        <h4 style={{ fontWeight: 700, marginBottom: '1rem', fontSize: '0.95rem' }}>⚙️ Gradebook Settings</h4>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                            {/* Subjects */}
+                                            <div>
+                                                <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.5rem' }}>Subjects</div>
+                                                <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem' }}>
+                                                    <input className="form-input" placeholder="Add subject…" value={newSubjectInput}
+                                                        onChange={e => setNewSubjectInput(e.target.value)}
+                                                        onKeyDown={e => { if (e.key === 'Enter' && newSubjectInput.trim()) { updateSubjects([...SUBJECTS, newSubjectInput.trim()]); setNewSubjectInput(''); } }}
+                                                        style={{ flex: 1, padding: '0.35rem 0.6rem' }} />
+                                                    <button className="btn btn-primary" style={{ padding: '0.35rem 0.75rem' }}
+                                                        onClick={() => { if (newSubjectInput.trim()) { updateSubjects([...SUBJECTS, newSubjectInput.trim()]); setNewSubjectInput(''); } }}>
+                                                        <PlusCircle size={14} />
+                                                    </button>
+                                                </div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                                    {SUBJECTS.map(s => (
+                                                        <span key={s} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#e0f2fe', color: '#0369a1', borderRadius: '999px', padding: '0.2rem 0.7rem', fontSize: '0.8rem', fontWeight: 600 }}>
+                                                            {s}
+                                                            <button onClick={() => updateSubjects(SUBJECTS.filter(x => x !== s))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0369a1', display: 'flex', alignItems: 'center' }}><X size={12} /></button>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            {/* Terms */}
+                                            <div>
+                                                <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.5rem' }}>Terms</div>
+                                                <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem' }}>
+                                                    <input className="form-input" placeholder="Add term…" value={newTermInput}
+                                                        onChange={e => setNewTermInput(e.target.value)}
+                                                        onKeyDown={e => { if (e.key === 'Enter' && newTermInput.trim()) { updateTerms([...TERMS, newTermInput.trim()]); setNewTermInput(''); } }}
+                                                        style={{ flex: 1, padding: '0.35rem 0.6rem' }} />
+                                                    <button className="btn btn-primary" style={{ padding: '0.35rem 0.75rem' }}
+                                                        onClick={() => { if (newTermInput.trim()) { updateTerms([...TERMS, newTermInput.trim()]); setNewTermInput(''); } }}>
+                                                        <PlusCircle size={14} />
+                                                    </button>
+                                                </div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                                    {TERMS.map(t => (
+                                                        <span key={t} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#f3e8ff', color: '#7c3aed', borderRadius: '999px', padding: '0.2rem 0.7rem', fontSize: '0.8rem', fontWeight: 600 }}>
+                                                            {t}
+                                                            <button onClick={() => updateTerms(TERMS.filter(x => x !== t))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7c3aed', display: 'flex', alignItems: 'center' }}><X size={12} /></button>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {/* Subject Total Marks */}
+                                        <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                                                <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>📝 Subject Total Marks</div>
+                                                {(() => {
+                                                    const grandTotal = SUBJECTS.reduce((s, sub) => s + getSubjectTotal(sub), 0);
+                                                    return (
+                                                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1d4ed8', background: '#dbeafe', borderRadius: '999px', padding: '0.15rem 0.6rem' }}>
+                                                            Grand Total: {grandTotal} marks
+                                                        </span>
+                                                    );
+                                                })()}
+                                                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Leave blank to use 100 per subject</span>
+                                            </div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.5rem' }}>
+                                                {SUBJECTS.map(sub => (
+                                                    <div key={sub} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.4rem 0.6rem' }}>
+                                                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</span>
+                                                        <input
+                                                            type="number" min="1" max="9999"
+                                                            value={WEIGHTS[sub] || ''}
+                                                            placeholder="100"
+                                                            onChange={e => {
+                                                                const val = e.target.value === '' ? undefined : Number(e.target.value);
+                                                                const newW = { ...WEIGHTS };
+                                                                if (val === undefined || val <= 0) delete newW[sub]; else newW[sub] = val;
+                                                                updateWeights(newW);
+                                                            }}
+                                                            style={{ width: '60px', padding: '0.25rem 0.35rem', border: '1px solid #d1d5db', borderRadius: '6px', textAlign: 'center', fontSize: '0.82rem', fontWeight: 700 }}
+                                                        />
+                                                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>pts</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {/* Grading Scale Reference */}
+                                        <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
+                                            <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.5rem' }}>Grading Scale (Pakistani Standard)</div>
+                                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                                {[['A+', '90-100', '#dcfce7', '#15803d'], ['A', '80-89', '#dcfce7', '#15803d'], ['B+', '70-79', '#dbeafe', '#1d4ed8'], ['B', '60-69', '#dbeafe', '#1d4ed8'], ['C', '50-59', '#fef9c3', '#a16207'], ['D', '40-49', '#ffedd5', '#c2410c'], ['F', '<40', '#fee2e2', '#dc2626']].map(([g, r, bg, col]) => (
+                                                    <span key={g} style={{ background: bg, color: col, borderRadius: '6px', padding: '0.2rem 0.6rem', fontSize: '0.78rem', fontWeight: 700 }}>{g}: {r}%</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ── Class Statistics ── */}
+                                <div style={{ marginBottom: '1.25rem' }}>
+                                    <button onClick={() => setShowGbStats(s => !s)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.75rem' }}>
+                                        📈 Class Statistics {showGbStats ? '▲' : '▼'}
+                                    </button>
+                                    {showGbStats && (
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                                            {/* Overall */}
+                                            <div style={{ background: 'linear-gradient(135deg, #1e3a5f, #2563eb)', color: 'white', borderRadius: '12px', padding: '1rem' }}>
+                                                <div style={{ fontSize: '0.75rem', opacity: 0.8, marginBottom: '0.2rem' }}>Class Average</div>
+                                                <div style={{ fontSize: '2rem', fontWeight: 800 }}>{overallAvg}%</div>
+                                                <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>{classStudents.length} students • {calcGrade(overallAvg)} overall</div>
+                                            </div>
+                                            <div style={{ background: 'linear-gradient(135deg, #059669, #10b981)', color: 'white', borderRadius: '12px', padding: '1rem' }}>
+                                                <div style={{ fontSize: '0.75rem', opacity: 0.8, marginBottom: '0.2rem' }}>Pass Rate</div>
+                                                <div style={{ fontSize: '2rem', fontWeight: 800 }}>{classStudents.length ? Math.round((passCount / classStudents.length) * 100) : 0}%</div>
+                                                <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>{passCount} / {classStudents.length} passed (≥40%)</div>
+                                            </div>
+                                            {/* Per-subject stats */}
+                                            {subjectStats.map(({ sub, avg, high, pass, total }) => {
+                                                const gc = gradeColor(avg);
+                                                return (
+                                                    <div key={sub} style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1rem' }}>
+                                                        <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.4rem', color: '#1e293b' }}>{sub}</div>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b' }}>
+                                                            <span>Avg: <b style={{ color: gc.text }}>{avg}%</b></span>
+                                                            <span>High: <b style={{ color: '#15803d' }}>{high}%</b></span>
+                                                            <span>Pass: <b>{pass}/{total}</b></span>
+                                                        </div>
+                                                        <div style={{ height: '6px', background: '#f1f5f9', borderRadius: '999px', overflow: 'hidden', marginTop: '0.5rem' }}>
+                                                            <div style={{ width: `${avg}%`, height: '100%', background: gc.text, borderRadius: '999px', transition: 'width 0.8s ease' }} />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     )}
-                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                        <thead>
-                                            <tr style={{ background: 'var(--color-gray-50)' }}>
-                                                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-gray-900)' }}>
-                                                    Subject
-                                                </th>
-                                                <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-gray-900)' }}>
-                                                    Obtained
-                                                </th>
-                                                <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-gray-900)' }}>
-                                                    Grade
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {(selectedAssessmentIndex === -1
-                                                ? (editingMarks ? tempMarks : (students.find(s => s.id === selectedStudent)?.results || []))
-                                                : (students.find(s => s.id === selectedStudent)?.previousResults?.[selectedAssessmentIndex]?.results || [])
-                                            ).map((result, idx) => (
-                                                <tr key={idx} style={{ borderTop: '1px solid var(--color-gray-200)' }}>
-                                                    <td style={{ padding: '1rem', fontWeight: 'var(--font-weight-medium)' }}>
-                                                        {result.subject}
-                                                    </td>
-                                                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                                                        {editingMarks ? (
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                max={result.total || 100}
-                                                                value={result.obtained !== undefined ? result.obtained : result.percentage}
-                                                                onChange={(e) => handleMarkChange(idx, 'obtained', e.target.value)}
-                                                                className="form-input"
-                                                                style={{ width: '80px', padding: '0.4rem', textAlign: 'center' }}
-                                                            />
-                                                        ) : (
-                                                            <span style={{ fontWeight: 'var(--font-weight-bold)', color: getGradeColor(result.percentage) }}>
-                                                                {result.obtained !== undefined ? result.obtained : result.percentage} / {result.total || 100} ({result.percentage}%)
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                                                        <span style={{
-                                                            display: 'inline-block',
-                                                            width: '32px',
-                                                            height: '32px',
-                                                            lineHeight: '32px',
-                                                            borderRadius: '50%',
-                                                            background: getGradeColor(result.percentage),
-                                                            color: 'white',
-                                                            fontWeight: 'var(--font-weight-bold)',
-                                                            fontSize: '0.85rem'
-                                                        }}>
-                                                            {result.grade}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
                                 </div>
-                            )}
-                        </div>
-                    )}
 
-                    {/* Other tabs (Attendance, Fees, Reports) reusing existing logic */}
+                                {/* ── Gradebook Table ── */}
+                                {classStudents.length === 0 ? (
+                                    <div className="card" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                                        <Users size={48} style={{ margin: '0 auto 1rem', color: '#cbd5e1' }} />
+                                        <p>No students in {selectedClass} yet.</p>
+                                    </div>
+                                ) : (
+                                    <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                                        {Object.keys(gbEdits).length > 0 && (
+                                            <div style={{ padding: '0.6rem 1rem', background: '#fef9c3', borderBottom: '1px solid #fef08a', color: '#854d0e', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                ✏️ You have unsaved changes. Click <b>Save All</b> to apply.
+                                            </div>
+                                        )}
+                                        <div style={{ overflowX: 'auto' }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: `${300 + SUBJECTS.length * 110}px` }}>
+                                                <thead>
+                                                    <tr style={{ background: '#1e293b', color: 'white' }}>
+                                                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, fontSize: '0.82rem', position: 'sticky', left: 0, background: '#1e293b', zIndex: 2, minWidth: '180px' }}>Student</th>
+                                                        {SUBJECTS.map(sub => (
+                                                            <th key={sub} style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700, fontSize: '0.78rem', minWidth: '100px' }}>
+                                                                {sub}<br /><span style={{ opacity: 0.6, fontWeight: 400 }}>/{getSubjectTotal(sub)}</span>
+                                                            </th>
+                                                        ))}
+                                                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700, fontSize: '0.78rem', minWidth: '80px', background: '#0f172a' }}>Wtd Avg%</th>
+                                                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700, fontSize: '0.78rem', minWidth: '60px', background: '#0f172a' }}>Grade</th>
+                                                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: 700, fontSize: '0.78rem', minWidth: '160px' }}>Remarks</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {classStudents.map((student, rowIdx) => {
+                                                        // Compute overall % using per-subject totals
+                                                        const subResults = SUBJECTS.map(sub => {
+                                                            const val = getCellValue(student, sub);
+                                                            return val !== '' ? { subject: sub, obtained: Number(val), percentage: Math.round((Number(val) / getSubjectTotal(sub)) * 100) } : null;
+                                                        }).filter(Boolean);
+                                                        const rowAvg = subResults.length ? calcOverallPct(subResults) : null;
+                                                        const rowGrade = rowAvg !== null ? calcGrade(rowAvg) : '—';
+                                                        const rowGc = rowAvg !== null ? gradeColor(rowAvg) : { bg: '#f8fafc', text: '#94a3b8' };
+                                                        const existingRemark = (student.results || [])[0]?.remarks || '';
+
+                                                        return (
+                                                            <tr key={student.id} style={{ borderTop: '1px solid #f1f5f9', background: rowIdx % 2 === 0 ? 'white' : '#fafafa' }}>
+                                                                {/* Student name cell */}
+                                                                <td style={{ padding: '0.6rem 1rem', position: 'sticky', left: 0, background: rowIdx % 2 === 0 ? 'white' : '#fafafa', zIndex: 1, borderRight: '1px solid #e2e8f0' }}>
+                                                                    <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1e293b' }}>{student.name}</div>
+                                                                    <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{student.id}</div>
+                                                                </td>
+                                                                {/* Subject cells */}
+                                                                {SUBJECTS.map(sub => {
+                                                                    const subTotal = getSubjectTotal(sub);
+                                                                    const val = getCellValue(student, sub);
+                                                                    const pct = val !== '' ? Math.round((Number(val) / subTotal) * 100) : null;
+                                                                    const gc = pct !== null ? gradeColor(pct) : { bg: 'transparent', text: '#94a3b8' };
+                                                                    const isDirty = gbEdits[student.id]?.[sub] !== undefined;
+                                                                    return (
+                                                                        <td key={sub} style={{ padding: '0.4rem 0.3rem', textAlign: 'center' }}>
+                                                                            <div style={{ position: 'relative', display: 'inline-block' }}>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    min="0"
+                                                                                    max={subTotal}
+                                                                                    value={val}
+                                                                                    onChange={e => handleCellEdit(student.id, sub, e.target.value)}
+                                                                                    style={{
+                                                                                        width: '70px', padding: '0.35rem 0.4rem',
+                                                                                        textAlign: 'center', borderRadius: '6px',
+                                                                                        border: isDirty ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                                                                                        background: gc.bg, color: gc.text,
+                                                                                        fontWeight: 700, fontSize: '0.88rem',
+                                                                                        outline: 'none'
+                                                                                    }}
+                                                                                />
+                                                                                {pct !== null && (
+                                                                                    <div style={{ fontSize: '0.65rem', color: gc.text, fontWeight: 600, marginTop: '1px' }}>
+                                                                                        {pct}% · {calcGrade(pct)}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </td>
+                                                                    );
+                                                                })}
+                                                                {/* Average */}
+                                                                <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', background: rowGc.bg }}>
+                                                                    <div style={{ fontWeight: 800, fontSize: '1rem', color: rowGc.text }}>{rowAvg !== null ? `${rowAvg}%` : '—'}</div>
+                                                                </td>
+                                                                {/* Grade badge */}
+                                                                <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', background: rowGc.bg }}>
+                                                                    <span style={{ display: 'inline-block', background: rowGc.text, color: 'white', borderRadius: '6px', padding: '0.2rem 0.5rem', fontWeight: 800, fontSize: '0.85rem' }}>{rowGrade}</span>
+                                                                </td>
+                                                                {/* Remarks */}
+                                                                <td style={{ padding: '0.4rem 0.5rem' }}>
+                                                                    <input
+                                                                        type="text"
+                                                                        defaultValue={existingRemark}
+                                                                        placeholder="Teacher remarks…"
+                                                                        onBlur={e => saveRemarks(student.id, SUBJECTS[0], e.target.value)}
+                                                                        style={{ width: '100%', padding: '0.3rem 0.5rem', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.78rem', color: '#475569' }}
+                                                                    />
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        {/* Footer legend */}
+                                        <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid #f1f5f9', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>Grade Scale:</span>
+                                            {[['A+', '≥90', '#dcfce7', '#15803d'], ['A', '≥80', '#dcfce7', '#15803d'], ['B+', '≥70', '#dbeafe', '#1d4ed8'], ['B', '≥60', '#dbeafe', '#1d4ed8'], ['C', '≥50', '#fef9c3', '#a16207'], ['D', '≥40', '#ffedd5', '#c2410c'], ['F', '<40', '#fee2e2', '#dc2626']].map(([g, r, bg, col]) => (
+                                                <span key={g} style={{ background: bg, color: col, borderRadius: '4px', padding: '0.15rem 0.5rem', fontSize: '0.72rem', fontWeight: 700 }}>{g} {r}%</span>
+                                            ))}
+                                            <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#94a3b8' }}>Blue border = unsaved edit</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
+
+                    {/* ========== ATTENDANCE TAB ========== */}
                     {activeTab === 'attendance' && (
                         <div className="animate-fade-in">
                             <div className="flex-between" style={{ marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
@@ -2039,6 +2206,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                         </div>
                     )}
 
+                    {/* ========== FEES TAB ========== */}
                     {activeTab === 'fees' && (
                         <div className="animate-fade-in">
                             <div className="flex-between" style={{ marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
@@ -2106,7 +2274,9 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                         </div>
                     )}
 
+                    {/* ========== ADMISSIONS TAB ========== */}
                     {activeTab === 'admissions' && (
+
                         <div className="animate-fade-in">
                             <div className="flex-between" style={{ marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                                 <h2 style={{ fontSize: '1.75rem', fontWeight: 'var(--font-weight-bold)' }}>Admission Form</h2>
@@ -2416,7 +2586,6 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                     )}
 
                     {activeTab === 'announcements' && (
-                        /* existing announcements code... */
                         <div className="animate-fade-in">
                             <h2 style={{ fontSize: '1.75rem', fontWeight: 'var(--font-weight-bold)', marginBottom: '1.5rem' }}>Manage Announcements</h2>
                             <div className="grid grid-cols-2" style={{ gap: '2rem', alignItems: 'start' }}>
@@ -2776,157 +2945,288 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                     </select>
                                 </div>
                             </div>
-
-                            <div className="flex gap-2" style={{ marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                                <button onClick={downloadClassTemplate} className="btn" style={{ background: '#10b981', color: 'white', borderColor: '#10b981' }}>
-                                    <Download size={18} /> Download Template
-                                </button>
-                                <button onClick={() => classImportFileRef.current.click()} className="btn" style={{ background: '#3b82f6', color: 'white', borderColor: '#3b82f6' }}>
-                                    <Upload size={18} /> Import Excel
-                                </button>
-                                <button onClick={exportClassRoster} className="btn" style={{ background: '#217346', color: 'white', borderColor: '#217346' }}>
-                                    <Download size={18} /> Export Roster
-                                </button>
-                            </div>
-
-                            {/* Add / Remove Class Panel */}
-                            <div className="card" style={{ padding: '1.25rem', marginBottom: '1.5rem', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                                <h4 style={{ fontWeight: 700, marginBottom: '1rem', fontSize: '1rem' }}>Manage Classes</h4>
-                                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1rem' }}>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="New class name (e.g. Class 11)"
-                                        value={newClassName}
-                                        onChange={(e) => setNewClassName(e.target.value)}
-                                        style={{ maxWidth: '260px' }}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && newClassName.trim()) {
-                                                const trimmed = newClassName.trim();
-                                                if (CLASSES.includes(trimmed)) { alert('Class already exists!'); return; }
-                                                const updated = [...CLASSES, trimmed];
-                                                updateClasses(updated);
-                                                setSelectedClassForList(trimmed);
-                                                setNewClassName('');
-                                                showSaveMessage(`Class "${trimmed}" added!`);
-                                            }
-                                        }}
-                                    />
-                                    <button
-                                        className="btn btn-primary"
-                                        onClick={() => {
-                                            const trimmed = newClassName.trim();
-                                            if (!trimmed) return;
-                                            if (CLASSES.includes(trimmed)) { alert('Class already exists!'); return; }
-                                            const updated = [...CLASSES, trimmed];
-                                            updateClasses(updated);
-                                            setSelectedClassForList(trimmed);
-                                            setNewClassName('');
-                                            showSaveMessage(`Class "${trimmed}" added!`);
-                                        }}
-                                    >
-                                        <PlusCircle size={16} /> Add Class
-                                    </button>
-                                </div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                                    {CLASSES.map(cls => {
-                                        const count = students.filter(s => s.grade === cls).length;
-                                        return (
-                                            <div key={cls} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.35rem 0.75rem', borderRadius: '999px', background: selectedClassForList === cls ? 'var(--color-primary)' : '#e2e8f0', color: selectedClassForList === cls ? 'white' : '#374151', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}
-                                                onClick={() => setSelectedClassForList(cls)}>
-                                                {cls} <span style={{ opacity: 0.75 }}>({count})</span>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (!window.confirm(`Delete class "${cls}"? Students in this class will NOT be deleted.`)) return;
-                                                        const updated = CLASSES.filter(c => c !== cls);
-                                                        updateClasses(updated);
-                                                        if (selectedClassForList === cls) setSelectedClassForList(updated[0] || '');
-                                                        showSaveMessage(`Class "${cls}" removed!`);
-                                                    }}
-                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 2px', display: 'flex', alignItems: 'center', color: selectedClassForList === cls ? 'rgba(255,255,255,0.8)' : '#94a3b8' }}
-                                                    title="Remove class"
-                                                >
-                                                    <X size={13} />
-                                                </button>
+                            {/* --- Classes Section (Restructured) --- */}
+                            {/* If viewing class details */}
+                            {viewingClass ? (
+                                <div className="card animate-fade-in" style={{ padding: '0', overflow: 'hidden' }}>
+                                    {/* Class Detail Header */}
+                                    <div style={{
+                                        background: 'linear-gradient(to right, #f8fafc, #edf2f7)',
+                                        borderBottom: '1px solid #e2e8f0',
+                                        padding: '1.5rem',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                            <button onClick={() => setViewingClass(null)} className="btn" style={{ padding: '0.4rem 0.6rem', color: '#64748b' }}>
+                                                <ChevronRight size={18} style={{ transform: 'rotate(180deg)' }} /> Back
+                                            </button>
+                                            <div>
+                                                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>{viewingClass}</h3>
+                                                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem', fontSize: '0.85rem', color: '#64748b' }}>
+                                                    <span>{SECTIONS.find(s => s.classes.includes(viewingClass))?.name || 'Unassigned'}</span>
+                                                    <span>•</span>
+                                                    <span>{students.filter(s => s.grade === viewingClass).length} Students</span>
+                                                </div>
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            <div style={{ marginBottom: '1rem' }}>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="Search students..."
-                                    value={classListSearch}
-                                    onChange={(e) => setClassListSearch(e.target.value)}
-                                    style={{ maxWidth: '300px' }}
-                                />
-                            </div>
-
-                            {(() => {
-                                const classStudents = students.filter(s => s.grade === selectedClassForList &&
-                                    (classListSearch === '' || s.name.toLowerCase().includes(classListSearch.toLowerCase()) ||
-                                        s.id.toLowerCase().includes(classListSearch.toLowerCase())));
-
-                                return classStudents.length === 0 ? (
-                                    <div style={{ textAlign: 'center', padding: '4rem 0', color: '#94a3b8' }}>
-                                        <Users size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-                                        <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>No students in {selectedClassForList}</p>
-                                        <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>Import students using the Excel template</p>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <button onClick={() => { setSelectedClassForList(viewingClass); classImportFileRef.current.click(); }} className="btn btn-secondary">
+                                                <Upload size={16} /> Import Excel
+                                            </button>
+                                            <button onClick={() => { setSelectedClassForList(viewingClass); setTimeout(exportClassRoster, 100); }} className="btn btn-secondary">
+                                                <Download size={16} /> Export
+                                            </button>
+                                            <button onClick={() => { setSelectedClassForList(viewingClass); setAdmissionData(prev => ({ ...prev, applyingFor: viewingClass })); setActiveTab('admissions'); }} className="btn btn-primary">
+                                                <PlusCircle size={16} /> Add Student
+                                            </button>
+                                        </div>
                                     </div>
-                                ) : (
-                                    <div className="card" style={{ padding: 0, overflow: 'auto' }}>
+
+                                    {/* Gender Tabs */}
+                                    <div style={{ padding: '0 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '1.5rem' }}>
+                                        {['boys', 'girls', 'all'].map(tab => {
+                                            const label = tab === 'all' ? 'All Students' : (tab === 'boys' ? 'Boys' : 'Girls');
+                                            const count = students.filter(s => s.grade === viewingClass && (tab === 'all' || s.admissions?.[0]?.gender === (tab === 'boys' ? 'Male' : 'Female'))).length;
+                                            return (
+                                                <button
+                                                    key={tab}
+                                                    onClick={() => setClassDetailTab(tab)}
+                                                    style={{
+                                                        padding: '1rem 0',
+                                                        borderBottom: classDetailTab === tab ? '2px solid var(--color-primary)' : '2px solid transparent',
+                                                        color: classDetailTab === tab ? 'var(--color-primary)' : '#64748b',
+                                                        fontWeight: 600,
+                                                        background: 'none',
+                                                        border: 'nones',
+                                                        borderBottomStyle: 'solid',
+                                                        borderBottomWidth: classDetailTab === tab ? '2px' : '0',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    {label} <span style={{ background: '#e2e8f0', padding: '0.1rem 0.4rem', borderRadius: '999px', fontSize: '0.7rem', color: '#475569', marginLeft: '0.2rem' }}>{count}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Student List */}
+                                    <div style={{ padding: '1.5rem' }}>
                                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                            <thead style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                                                <tr>
-                                                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 700, fontSize: '0.85rem', color: '#64748b' }}>Student ID</th>
-                                                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 700, fontSize: '0.85rem', color: '#64748b' }}>Name</th>
-                                                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 700, fontSize: '0.85rem', color: '#64748b' }}>Father Name</th>
-                                                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 700, fontSize: '0.85rem', color: '#64748b' }}>Contact</th>
-                                                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 700, fontSize: '0.85rem', color: '#64748b' }}>Fee Status</th>
-                                                    <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 700, fontSize: '0.85rem', color: '#64748b' }}>Actions</th>
+                                            <thead>
+                                                <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#64748b', fontSize: '0.8rem', textTransform: 'uppercase' }}>
+                                                    <th style={{ padding: '0.75rem' }}>ID</th>
+                                                    <th style={{ padding: '0.75rem' }}>Name</th>
+                                                    <th style={{ padding: '0.75rem' }}>Father Name</th>
+                                                    <th style={{ padding: '0.75rem' }}>Gender</th>
+                                                    <th style={{ padding: '0.75rem' }}>Contact</th>
+                                                    <th style={{ padding: '0.75rem' }}>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {classStudents.map((student, idx) => {
-                                                    const admission = student.admissions?.[0] || {};
-                                                    return (
-                                                        <tr key={student.id} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? 'white' : '#fafbfc' }}>
-                                                            <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: 600, color: '#2563eb' }}>{student.id}</td>
-                                                            <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: 600 }}>{student.name}</td>
-                                                            <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#64748b' }}>{admission.fatherName || 'N/A'}</td>
-                                                            <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#64748b' }}>{admission.contact || 'N/A'}</td>
-                                                            <td style={{ padding: '1rem' }}>
+                                                {students
+                                                    .filter(s => s.grade === viewingClass && (classDetailTab === 'all' || s.admissions?.[0]?.gender === (classDetailTab === 'boys' ? 'Male' : 'Female')))
+                                                    .map(student => (
+                                                        <tr key={student.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                            <td style={{ padding: '0.75rem', fontWeight: 600 }}>{student.id}</td>
+                                                            <td style={{ padding: '0.75rem' }}>
+                                                                <div style={{ fontWeight: 600 }}>{student.name}</div>
+                                                            </td>
+                                                            <td style={{ padding: '0.75rem', color: '#64748b' }}>{student.admissions?.[0]?.fatherName || '—'}</td>
+                                                            <td style={{ padding: '0.75rem' }}>
                                                                 <span style={{
-                                                                    padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 700,
-                                                                    background: student.fee_status === 'Paid' ? '#d1fae5' : student.fee_status === 'Pending' ? '#fef3c7' : '#fee2e2',
-                                                                    color: student.fee_status === 'Paid' ? '#065f46' : student.fee_status === 'Pending' ? '#92400e' : '#991b1b'
+                                                                    padding: '0.2rem 0.6rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 600,
+                                                                    background: student.admissions?.[0]?.gender === 'Male' ? '#e0f2fe' : '#fce7f3',
+                                                                    color: student.admissions?.[0]?.gender === 'Male' ? '#0369a1' : '#be185d'
                                                                 }}>
-                                                                    {student.fee_status || 'Pending'}
+                                                                    {student.admissions?.[0]?.gender || '—'}
                                                                 </span>
                                                             </td>
-                                                            <td style={{ padding: '1rem', textAlign: 'center' }}>
-                                                                <button onClick={() => { setSelectedStudent(student); setActiveTab('reports'); }} className="btn btn-sm" style={{ background: '#eff6ff', color: '#2563eb', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
-                                                                    View Details
+                                                            <td style={{ padding: '0.75rem', color: '#64748b' }}>{student.admissions?.[0]?.contact || '—'}</td>
+                                                            <td style={{ padding: '0.75rem' }}>
+                                                                <button onClick={() => {
+                                                                    if (window.confirm(`Delete ${student.name}? This cannot be undone.`)) {
+                                                                        const newStudents = students.filter(s => s.id !== student.id);
+                                                                        setStudents(newStudents);
+                                                                    }
+                                                                }} className="btn icon-btn" style={{ color: '#ef4444' }} title="Delete Student">
+                                                                    <Trash2 size={16} />
                                                                 </button>
                                                             </td>
                                                         </tr>
-                                                    );
-                                                })}
+                                                    ))}
                                             </tbody>
                                         </table>
-                                        <div style={{ padding: '1rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
-                                            Total Students: {classStudents.length}
+                                        {students.filter(s => s.grade === viewingClass).length === 0 && (
+                                            <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                                                <Users size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+                                                <p>No students found in this list.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                // SECTIONS & CLASSES OVERVIEW
+                                <div className="animate-fade-in">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                        <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e293b' }}>Class Management</h3>
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <input
+                                                type="text"
+                                                placeholder="New Section Name"
+                                                className="form-input"
+                                                value={newSectionName}
+                                                onChange={e => setNewSectionName(e.target.value)}
+                                                style={{ width: '200px' }}
+                                            />
+                                            <button onClick={async () => {
+                                                if (!newSectionName.trim()) return;
+                                                const id = `sec_${Date.now()}`;
+                                                const newSec = { id, name: newSectionName.trim(), classes: [] };
+                                                const currentSections = Array.isArray(SECTIONS) ? SECTIONS : [];
+                                                const updated = [...currentSections, newSec];
+
+                                                try {
+                                                    const { error } = await updateSections(updated);
+                                                    if (error) {
+                                                        alert("Failed to add section: " + error.message);
+                                                    } else {
+                                                        setNewSectionName('');
+                                                        // Explicitly select the new section 
+                                                        setSelectedSectionId(id);
+                                                        showSaveMessage(`Section "${newSec.name}" added!`);
+                                                    }
+                                                } catch (err) {
+                                                    alert("An unexpected error occurred: " + err.message);
+                                                }
+                                            }} className="btn btn-primary">
+                                                <PlusCircle size={16} /> Add Section
+                                            </button>
                                         </div>
                                     </div>
-                                );
-                            })()}
+
+                                    {/* Section Tabs */}
+                                    <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0', marginBottom: '1.5rem' }}>
+                                        {(SECTIONS || []).map(sec => (
+                                            <button
+                                                key={sec.id}
+                                                onClick={() => setSelectedSectionId(sec.id)}
+                                                style={{
+                                                    padding: '0.6rem 1.2rem',
+                                                    borderRadius: '8px',
+                                                    fontWeight: 600,
+                                                    background: selectedSectionId === sec.id ? 'var(--color-primary)' : 'white',
+                                                    color: selectedSectionId === sec.id ? 'white' : '#64748b',
+                                                    border: '1px solid',
+                                                    borderColor: selectedSectionId === sec.id ? 'var(--color-primary)' : '#e2e8f0',
+                                                    cursor: 'pointer',
+                                                    whiteSpace: 'nowrap',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                {sec.name}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Selected Section Content */}
+                                    {selectedSectionId && (() => {
+                                        const currentSection = (SECTIONS || []).find(s => s.id === selectedSectionId);
+                                        if (!currentSection) return <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>Select a section to manage classes.</div>;
+
+                                        return (
+                                            <div className="card">
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                                    <h4 style={{ fontSize: '1.25rem', fontWeight: 700 }}>{currentSection.name} Classes</h4>
+                                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="New Class Name"
+                                                            className="form-input"
+                                                            value={newClassName}
+                                                            onChange={e => setNewClassName(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter' && newClassName.trim()) {
+                                                                    const trimmed = newClassName.trim();
+                                                                    if (currentSection.classes.includes(trimmed)) { alert('Class already exists in this section!'); return; }
+                                                                    // Update Section
+                                                                    const updatedSections = SECTIONS.map(s => s.id === selectedSectionId ? { ...s, classes: [...s.classes, trimmed] } : s);
+                                                                    updateSections(updatedSections);
+                                                                    // Update Global Classes List
+                                                                    if (!CLASSES.includes(trimmed)) updateClasses([...CLASSES, trimmed]);
+                                                                    setNewClassName('');
+                                                                    showSaveMessage(`Class "${trimmed}" added to ${currentSection.name}!`);
+                                                                }
+                                                            }}
+                                                            style={{ width: '200px' }}
+                                                        />
+                                                        <button onClick={() => {
+                                                            const trimmed = newClassName.trim();
+                                                            if (!trimmed) return;
+                                                            if (currentSection.classes.includes(trimmed)) { alert('Class already exists in this section!'); return; }
+                                                            const updatedSections = SECTIONS.map(s => s.id === selectedSectionId ? { ...s, classes: [...s.classes, trimmed] } : s);
+                                                            updateSections(updatedSections);
+                                                            if (!CLASSES.includes(trimmed)) updateClasses([...CLASSES, trimmed]);
+                                                            setNewClassName('');
+                                                            showSaveMessage(`Class "${trimmed}" added!`);
+                                                        }} className="btn btn-primary">
+                                                            <PlusCircle size={16} /> Add Class
+                                                        </button>
+                                                        <button onClick={() => {
+                                                            if (window.confirm(`Delete Section "${currentSection.name}"? This will NOT delete the classes globally, just grouping.`)) {
+                                                                const updated = SECTIONS.filter(s => s.id !== selectedSectionId);
+                                                                updateSections(updated);
+                                                                setSelectedSectionId(updated[0]?.id || null);
+                                                            }
+                                                        }} className="btn" style={{ color: '#ef4444', borderColor: '#ef4444', background: 'white' }}>
+                                                            <Trash2 size={16} /> Delete Section
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                                                    {currentSection.classes.map(cls => {
+                                                        const count = students.filter(s => s.grade === cls).length;
+                                                        return (
+                                                            <div key={cls} onClick={() => setViewingClass(cls)} style={{
+                                                                background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem',
+                                                                cursor: 'pointer', transition: 'all 0.2s', position: 'relative'
+                                                            }}
+                                                                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-primary)'}
+                                                                onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}
+                                                            >
+                                                                <h5 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem', color: '#1e293b' }}>{cls}</h5>
+                                                                <div style={{ fontSize: '0.85rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                                                    <Users size={14} /> {count} Students
+                                                                </div>
+                                                                <button onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (window.confirm(`Remove "${cls}" from this section?`)) {
+                                                                        const updatedSections = SECTIONS.map(s => s.id === selectedSectionId ? { ...s, classes: s.classes.filter(c => c !== cls) } : s);
+                                                                        updateSections(updatedSections);
+                                                                    }
+                                                                }} style={{
+                                                                    position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', opacity: 0.6
+                                                                }} title="Remove from section">
+                                                                    <X size={16} />
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {currentSection.classes.length === 0 && (
+                                                        <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '2rem', color: '#94a3b8', border: '2px dashed #e2e8f0', borderRadius: '12px' }}>
+                                                            No classes in this section yet. Add one above!
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            )}
                         </div>
                     )}
-
                 </div>
             </section>
         </div>
