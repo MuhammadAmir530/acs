@@ -133,6 +133,7 @@ export const SchoolDataProvider = ({ children }) => {
 
         const { error } = await supabase.from('students').upsert(dbStudents);
         if (!error) fetchData();
+        return { error };
     };
 
     const setAnnouncements = async (announcementsList) => {
