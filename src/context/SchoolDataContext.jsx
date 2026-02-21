@@ -123,13 +123,22 @@ export const SchoolDataProvider = ({ children }) => {
     };
 
     const setStudents = async (studentsList) => {
-        // Map back to snake_case for DB
-        const dbStudents = studentsList.map(s => ({
-            ...s,
-            fee_status: s.feeStatus,
-            previous_results: s.previousResults,
-            serial_number: s.serialNumber
-        }));
+        const dbStudents = studentsList.map(s => {
+            // Explicitly extract database fields, filtering out any camelCase React state keys
+            return {
+                id: s.id,
+                serial_number: s.serialNumber !== undefined ? s.serialNumber : s.serial_number,
+                password: s.password,
+                name: s.name,
+                grade: s.grade,
+                image: s.image !== undefined ? s.image : s.photo,
+                fee_status: s.feeStatus !== undefined ? s.feeStatus : s.fee_status,
+                results: s.results || [],
+                attendance: s.attendance || {},
+                previous_results: s.previousResults !== undefined ? s.previousResults : s.previous_results || [],
+                admissions: s.admissions || []
+            };
+        });
 
         const { error } = await supabase.from('students').upsert(dbStudents);
         if (!error) fetchData();
