@@ -12,7 +12,7 @@ import { useSchoolData } from '../context/SchoolDataContext';
 import { supabase } from '../supabaseClient';
 
 const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
-    const { schoolData, CLASSES, SUBJECTS, TERMS, SECTIONS, WEIGHTS, fetchData, setStudents, setFaculty, updateSchoolInfo, setAnnouncements, updateClasses, updateSubjects, updateTerms, updateSections, updateWeights } = useSchoolData();
+    const { schoolData, CLASSES, SUBJECTS, TERMS, SECTIONS, WEIGHTS, fetchData, setStudents, setFaculty, updateSchoolInfo, setAnnouncements, updateClasses, updateSubjects, updateTerms, updateSections, updateWeights, adminCredentials, changeAdminPassword } = useSchoolData();
     const [activeTab, setActiveTab] = useState('admissions');
     const [saveMessage, setSaveMessage] = useState('');
     const [selectedClass, setSelectedClass] = useState(CLASSES[0]);
@@ -22,8 +22,22 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     // ── Class Management State ──
     const [selectedSectionId, setSelectedSectionId] = useState(null);
     const [viewingClass, setViewingClass] = useState(null);
-    const [classDetailTab, setClassDetailTab] = useState('boys'); // 'boys', 'girls', 'all'
+    const [classDetailTab, setClassDetailTab] = useState('boys');
     const [newSectionName, setNewSectionName] = useState('');
+
+    // ── Confirm Modal State ──
+    const [confirmModal, setConfirmModal] = useState({ open: false, title: '', message: '', onConfirm: null, danger: true });
+    const openConfirm = (title, message, onConfirm, danger = true) => setConfirmModal({ open: true, title, message, onConfirm, danger });
+    const closeConfirm = () => setConfirmModal({ open: false, title: '', message: '', onConfirm: null, danger: true });
+
+    // ── Change Admin Password State ──
+    const [showChangePwd, setShowChangePwd] = useState(false);
+    const [newAdminUser, setNewAdminUser] = useState('');
+    const [newAdminPwd, setNewAdminPwd] = useState('');
+    const [newAdminPwdConfirm, setNewAdminPwdConfirm] = useState('');
+
+    // ── Attendance date filter ──
+    const [attDateFilter, setAttDateFilter] = useState('');
 
     // Initialize selected section
     useEffect(() => {
@@ -454,11 +468,11 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                 id: studentId,
                 serial_number: d.serialNumber ? d.serialNumber : null,
                 name: d.studentName,
-                password: 'acs' + Math.floor(1000 + Math.random() * 9000), // Random temporary password
+                password: 'acs' + Math.floor(1000 + Math.random() * 9000),
                 grade: d.applyingFor,
                 image: d.photo,
-                fee_status: 'unpaid',
-                admissions: [d], // Store form history
+                fee_history: [],
+                admissions: [d],
                 results: [],
                 attendance: { present: 0, absent: 0, total: 0, percentage: 0 },
                 previous_results: []
@@ -944,20 +958,30 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
 
 
     // --- ATTENDANCE FUNCTIONS ---
+    // Stores day-by-day records: attendance = { records: [{date, status}], total, present, absent, percentage }
     const markAttendance = async (studentId, status) => {
         const student = students.find(s => s.id === studentId);
         if (!student) return;
 
-        const newAttendance = { ...student.attendance };
-        newAttendance.total += 1;
-        if (status === 'present') {
-            newAttendance.present += 1;
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const oldAtt = student.attendance || {};
+        const records = [...(oldAtt.records || [])];
+
+        // Prevent duplicate entry for same day
+        const existingIdx = records.findIndex(r => r.date === today);
+        if (existingIdx >= 0) {
+            records[existingIdx] = { date: today, status }; // overwrite today's entry
         } else {
-            newAttendance.absent += 1;
+            records.push({ date: today, status });
         }
-        newAttendance.percentage = parseFloat(
-            ((newAttendance.present / newAttendance.total) * 100).toFixed(1)
-        );
+
+        // Recompute totals from records
+        const present = records.filter(r => r.status === 'present').length;
+        const absent = records.filter(r => r.status === 'absent').length;
+        const total = records.length;
+        const percentage = total > 0 ? parseFloat(((present / total) * 100).toFixed(1)) : 0;
+
+        const newAttendance = { records, total, present, absent, percentage };
 
         const { error } = await supabase
             .from('students')
@@ -966,8 +990,24 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
 
         if (!error) {
             fetchData();
-            showSaveMessage(`Attendance marked for ${student.name}!`);
+            showSaveMessage(`${status === 'present' ? '✓ Present' : '✗ Absent'} marked for ${student.name} on ${today}!`);
         }
+    };
+
+    // Undo/remove a specific date record for a student
+    const removeAttendanceRecord = async (studentId, dateStr) => {
+        const student = students.find(s => s.id === studentId);
+        if (!student) return;
+        const oldAtt = student.attendance || {};
+        const records = (oldAtt.records || []).filter(r => r.date !== dateStr);
+        const present = records.filter(r => r.status === 'present').length;
+        const absent = records.filter(r => r.status === 'absent').length;
+        const total = records.length;
+        const percentage = total > 0 ? parseFloat(((present / total) * 100).toFixed(1)) : 0;
+        const newAttendance = { records, total, present, absent, percentage };
+        await supabase.from('students').update({ attendance: newAttendance }).eq('id', studentId);
+        fetchData();
+        showSaveMessage(`Record for ${dateStr} removed.`);
     };
 
     // --- ATTENDANCE EXCEL EXPORT ---
@@ -1122,14 +1162,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         showSaveMessage(`Month "${monthLabel}" removed!`);
     };
 
-    // Legacy toggle (kept for backward compatibility)
-    const toggleFeeStatus = async (studentId) => {
-        const student = students.find(s => s.id === studentId);
-        if (!student) return;
-        const newStatus = student.feeStatus === 'paid' ? 'unpaid' : 'paid';
-        const { error } = await supabase.from('students').update({ fee_status: newStatus }).eq('id', studentId);
-        if (!error) { fetchData(); showSaveMessage(`Fee updated for ${student.name}!`); }
-    };
+
 
     // --- FEE EXCEL EXPORT ---
     const exportFeeExcel = () => {
@@ -1807,7 +1840,6 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                             grade: grade || existingStudent.grade,
                             password: password || existingStudent.password,
                             serialNumber: serial ? String(serial).trim() : existingStudent.serialNumber,
-                            feeStatus: row['Fee Status'] ? String(row['Fee Status']).toLowerCase() : existingStudent.feeStatus || existingStudent.fee_status,
                             admissions: admissions
                         };
 
@@ -1852,8 +1884,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                             password: password || ('acs' + Math.floor(1000 + Math.random() * 9000)),
                             grade: grade,
                             image: '',
-                            feeStatus: row['Fee Status'] ? String(row['Fee Status']).toLowerCase() : 'unpaid',
-                            fee_status: row['Fee Status'] ? String(row['Fee Status']).toLowerCase() : 'unpaid',
+                            feeHistory: [],
                             results: [],
                             attendance: { present: 0, absent: 0, total: 0, percentage: 0 },
                             previous_results: [],
@@ -1927,7 +1958,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                 'Nationality': adm.nationality || '', 'Father Name': adm.fatherName || '',
                 'Father CNIC': adm.fatherCnic || '', 'Contact Number': adm.contact || '',
                 'WhatsApp Number': adm.whatsapp || '', 'Address': adm.address || '',
-                'Fee Status': s.fee_status || 'Pending', 'Password': s.password
+                'Fee Dues': (s.feeHistory || []).filter(h => h.status === 'unpaid').length + ' unpaid month(s)', 'Password': s.password
             };
         });
         const ws = XLSX.utils.json_to_sheet(exportData);
@@ -1954,6 +1985,74 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
 
     return (
         <div style={{ background: 'var(--color-gray-50)', minHeight: 'calc(100vh - 80px)' }}>
+
+            {/* ═══════════════════════════════════════
+                CONFIRM MODAL (replaces window.confirm)
+            ═══════════════════════════════════════ */}
+            {confirmModal.open && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                    <div className="card animate-fade-in" style={{ maxWidth: '460px', width: '100%', padding: '2rem', textAlign: 'center', borderTop: `4px solid ${confirmModal.danger ? '#ef4444' : '#2563eb'}` }}>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.75rem' }}>{confirmModal.title}</div>
+                        <div style={{ color: '#475569', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.75rem' }}>{confirmModal.message}</div>
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                            <button onClick={closeConfirm} style={{ padding: '0.6rem 1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', color: '#475569', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem' }}>
+                                Cancel
+                            </button>
+                            <button onClick={() => { confirmModal.onConfirm?.(); closeConfirm(); }} style={{ padding: '0.6rem 1.5rem', borderRadius: '8px', border: 'none', background: confirmModal.danger ? '#ef4444' : '#2563eb', color: 'white', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
+                                {confirmModal.danger ? 'Yes, Delete' : 'Confirm'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ═══════════════════════════════════════
+                CHANGE ADMIN PASSWORD MODAL
+            ═══════════════════════════════════════ */}
+            {showChangePwd && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                    <div className="card animate-fade-in" style={{ maxWidth: '420px', width: '100%', padding: '2rem', borderTop: '4px solid #2563eb' }}>
+                        <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#1e293b', marginBottom: '0.25rem' }}>🔐 Change Admin Credentials</div>
+                        <p style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '1.5rem' }}>Update the admin username and password stored in the database.</p>
+                        <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontWeight: 600, color: '#475569', fontSize: '0.85rem', marginBottom: '0.4rem' }}>New Username</label>
+                            <input className="form-input" value={newAdminUser} onChange={e => setNewAdminUser(e.target.value)} placeholder={adminCredentials.username || 'admin'} style={{ width: '100%' }} />
+                        </div>
+                        <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontWeight: 600, color: '#475569', fontSize: '0.85rem', marginBottom: '0.4rem' }}>New Password</label>
+                            <input className="form-input" type="password" value={newAdminPwd} onChange={e => setNewAdminPwd(e.target.value)} placeholder="New password" style={{ width: '100%' }} />
+                        </div>
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', fontWeight: 600, color: '#475569', fontSize: '0.85rem', marginBottom: '0.4rem' }}>Confirm Password</label>
+                            <input className="form-input" type="password" value={newAdminPwdConfirm} onChange={e => setNewAdminPwdConfirm(e.target.value)} placeholder="Confirm password" style={{ width: '100%' }} />
+                            {newAdminPwd && newAdminPwdConfirm && newAdminPwd !== newAdminPwdConfirm && (
+                                <div style={{ color: '#dc2626', fontSize: '0.8rem', marginTop: '0.4rem' }}>⚠ Passwords do not match</div>
+                            )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                            <button onClick={() => { setShowChangePwd(false); setNewAdminUser(''); setNewAdminPwd(''); setNewAdminPwdConfirm(''); }} style={{ padding: '0.6rem 1.25rem', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>
+                                Cancel
+                            </button>
+                            <button onClick={async () => {
+                                if (!newAdminUser.trim() || !newAdminPwd.trim()) { alert('Username and password cannot be empty.'); return; }
+                                if (newAdminPwd !== newAdminPwdConfirm) { alert('Passwords do not match.'); return; }
+                                const { error } = await changeAdminPassword(newAdminUser.trim(), newAdminPwd.trim());
+                                if (!error) {
+                                    showSaveMessage('✅ Admin credentials updated!');
+                                    setShowChangePwd(false);
+                                    setNewAdminUser(''); setNewAdminPwd(''); setNewAdminPwdConfirm('');
+                                } else {
+                                    alert('Error updating: ' + error.message);
+                                }
+                            }} style={{ padding: '0.6rem 1.25rem', borderRadius: '8px', border: 'none', background: '#2563eb', color: 'white', fontWeight: 700, cursor: 'pointer' }}
+                                disabled={newAdminPwd !== newAdminPwdConfirm && !!newAdminPwdConfirm}>
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Hidden file inputs */}
             <input
                 type="file"
@@ -2031,18 +2130,24 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                             </h1>
                             <p style={{ opacity: 0.95 }}>Manage student marks, attendance & fees</p>
                         </div>
-                        <button
-                            onClick={handleLogout}
-                            className="btn"
-                            style={{
-                                background: 'rgba(255,255,255,0.2)',
-                                color: 'white',
-                                border: '2px solid white'
-                            }}
-                        >
-                            <LogOut size={18} />
-                            Logout
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                            <button
+                                onClick={() => { setNewAdminUser(adminCredentials.username || ''); setShowChangePwd(true); }}
+                                className="btn"
+                                style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: '2px solid rgba(255,255,255,0.5)' }}
+                            >
+                                <Lock size={16} />
+                                Change Password
+                            </button>
+                            <button
+                                onClick={handleLogout}
+                                className="btn"
+                                style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: '2px solid white' }}
+                            >
+                                <LogOut size={18} />
+                                Logout
+                            </button>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -2513,72 +2618,153 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                     })()}
 
                     {/* ========== ATTENDANCE TAB ========== */}
-                    {activeTab === 'attendance' && (
-                        <div className="animate-fade-in">
-                            <div className="flex-between" style={{ marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                                <h2 style={{ fontSize: '1.75rem', fontWeight: 'var(--font-weight-bold)' }}>Attendance Sheet</h2>
-                                <div className="flex gap-4" style={{ alignItems: 'center' }}>
-                                    <div className="flex gap-2" style={{ alignItems: 'center' }}>
-                                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-gray-500)' }}>Filter Class:</span>
-                                        <select
-                                            className="form-input"
-                                            style={{ padding: '0.4rem 0.8rem', minWidth: '180px' }}
-                                            value={selectedClass}
-                                            onChange={(e) => setSelectedClass(e.target.value)}
-                                        >
+                    {activeTab === 'attendance' && (() => {
+                        const today = new Date().toISOString().split('T')[0];
+                        const filterDate = attDateFilter || today;
+                        const classStudents = students
+                            .filter(s => s.grade === selectedClass)
+                            .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+
+                        // Compute stats for this class
+                        const totalDays = [...new Set(
+                            classStudents.flatMap(s => (s.attendance?.records || []).map(r => r.date))
+                        )].length;
+
+                        return (
+                            <div className="animate-fade-in">
+                                {/* Header */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                                    <div>
+                                        <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1e293b' }}>📅 Attendance</h2>
+                                        <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '0.25rem' }}>Day-by-day attendance tracking — {totalDays} school day{totalDays !== 1 ? 's' : ''} recorded</p>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <select className="form-input" style={{ padding: '0.5rem 0.8rem', minWidth: '150px' }} value={selectedClass} onChange={e => setSelectedClass(e.target.value)}>
                                             {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
-                                    </div>
-                                    <div className="flex gap-2" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <input type="date" value={attDateFilter} onChange={e => setAttDateFilter(e.target.value)}
+                                            className="form-input" style={{ padding: '0.5rem 0.8rem' }} />
                                         <button onClick={exportAttendanceExcel} style={{ ...excelBtnStyle, background: '#217346', color: 'white', borderColor: '#217346' }}>
-                                            <Download size={16} /> Export Excel
-                                        </button>
-                                        <button onClick={() => attendanceFileRef.current.click()} style={{ ...excelBtnStyle, background: 'white', color: '#217346', borderColor: '#217346' }}>
-                                            <Upload size={16} /> Import Excel
+                                            <Download size={16} /> Export
                                         </button>
                                     </div>
                                 </div>
-                            </div>
-                            <div className="card" style={{ padding: 0, overflow: 'hidden', overflowX: 'auto' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
-                                    <thead>
-                                        <tr style={{ background: 'var(--color-gray-50)', textAlign: 'left' }}>
-                                            <th style={{ padding: '1rem' }}>Student ID</th>
-                                            <th style={{ padding: '1rem' }}>Name</th>
-                                            <th style={{ padding: '1rem' }}>Attendance</th>
-                                            <th style={{ padding: '1rem', textAlign: 'center' }}>Mark Today</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {students.filter(s => s.grade === selectedClass).map((student) => (
-                                            <tr key={student.id} style={{ borderTop: '1px solid var(--color-gray-200)' }}>
-                                                <td style={{ padding: '1rem', color: 'var(--color-gray-600)' }}>{student.id}</td>
-                                                <td style={{ padding: '1rem', fontWeight: 'var(--font-weight-medium)' }}>{student.name}</td>
-                                                <td style={{ padding: '1rem' }}>
-                                                    <div className="flex gap-2" style={{ alignItems: 'center' }}>
-                                                        <div style={{ flex: 1, height: '8px', background: 'var(--color-gray-200)', borderRadius: '4px', maxWidth: '100px' }}>
-                                                            <div style={{ width: `${student.attendance.percentage}%`, height: '100%', background: getGradeColor(student.attendance.percentage), borderRadius: '4px' }}></div>
-                                                        </div>
-                                                        <span style={{ fontSize: '0.85rem', fontWeight: 'var(--font-weight-bold)' }}>{student.attendance.percentage}%</span>
-                                                    </div>
-                                                </td>
-                                                <td style={{ padding: '1rem', textAlign: 'center' }}>
-                                                    <div className="flex gap-1" style={{ justifyContent: 'center' }}>
-                                                        <button onClick={() => markAttendance(student.id, 'present')} title="Mark Present" style={{ padding: '0.4rem', borderRadius: '6px', background: '#dcfce7', color: '#16a34a', border: 'none', cursor: 'pointer' }}>
-                                                            <CheckCircle size={18} />
-                                                        </button>
-                                                        <button onClick={() => markAttendance(student.id, 'absent')} title="Mark Absent" style={{ padding: '0.4rem', borderRadius: '6px', background: '#fee2e2', color: '#dc2626', border: 'none', cursor: 'pointer' }}>
-                                                            <XCircle size={18} />
-                                                        </button>
-                                                    </div>
-                                                </td>
+
+                                {/* Mark All for Date */}
+                                <div style={{ background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '1px solid #bfdbfe', borderRadius: '14px', padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontWeight: 700, color: '#1e293b' }}>Mark Entire Class for: <span style={{ color: '#2563eb' }}>{filterDate}</span></div>
+                                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>Click to mark all {classStudents.length} students at once for this date</div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <button onClick={async () => {
+                                            for (const s of classStudents) {
+                                                const oldAtt = s.attendance || {};
+                                                const records = [...(oldAtt.records || [])];
+                                                const idx = records.findIndex(r => r.date === filterDate);
+                                                if (idx >= 0) records[idx] = { date: filterDate, status: 'present' };
+                                                else records.push({ date: filterDate, status: 'present' });
+                                                const present = records.filter(r => r.status === 'present').length;
+                                                const absent = records.length - present;
+                                                await supabase.from('students').update({ attendance: { records, total: records.length, present, absent, percentage: parseFloat(((present / records.length) * 100).toFixed(1)) } }).eq('id', s.id);
+                                            }
+                                            fetchData();
+                                            showSaveMessage(`All ${classStudents.length} students marked Present for ${filterDate}!`);
+                                        }} style={{ padding: '0.5rem 1rem', background: '#16a34a', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
+                                            ✓ All Present
+                                        </button>
+                                        <button onClick={async () => {
+                                            for (const s of classStudents) {
+                                                const oldAtt = s.attendance || {};
+                                                const records = [...(oldAtt.records || [])];
+                                                const idx = records.findIndex(r => r.date === filterDate);
+                                                if (idx >= 0) records[idx] = { date: filterDate, status: 'absent' };
+                                                else records.push({ date: filterDate, status: 'absent' });
+                                                const present = records.filter(r => r.status === 'present').length;
+                                                const absent = records.length - present;
+                                                await supabase.from('students').update({ attendance: { records, total: records.length, present, absent, percentage: parseFloat(((present / records.length) * 100).toFixed(1)) } }).eq('id', s.id);
+                                            }
+                                            fetchData();
+                                            showSaveMessage(`All ${classStudents.length} students marked Absent for ${filterDate}!`);
+                                        }} style={{ padding: '0.5rem 1rem', background: '#dc2626', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
+                                            ✗ All Absent
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Student rows */}
+                                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <thead>
+                                            <tr style={{ background: 'linear-gradient(to right, #f8fafc, #edf2f7)', borderBottom: '2px solid #e2e8f0' }}>
+                                                <th style={{ padding: '1rem', textAlign: 'left', color: '#475569', fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: 700 }}>Student</th>
+                                                <th style={{ padding: '1rem', textAlign: 'center', color: '#475569', fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: 700 }}>Today ({filterDate})</th>
+                                                <th style={{ padding: '1rem', textAlign: 'left', color: '#475569', fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: 700 }}>Overall %</th>
+                                                <th style={{ padding: '1rem', textAlign: 'left', color: '#475569', fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: 700 }}>Recent Records</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            {classStudents.map(student => {
+                                                const records = (student.attendance?.records || []).sort((a, b) => b.date.localeCompare(a.date));
+                                                const todayRecord = records.find(r => r.date === filterDate);
+                                                const pct = student.attendance?.percentage || 0;
+                                                const pctColor = pct >= 90 ? '#16a34a' : pct >= 75 ? '#2563eb' : pct >= 60 ? '#d97706' : '#dc2626';
+                                                return (
+                                                    <tr key={student.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                        <td style={{ padding: '0.85rem 1rem', minWidth: '160px' }}>
+                                                            <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.9rem' }}>{student.name}</div>
+                                                            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{student.id}</div>
+                                                        </td>
+                                                        <td style={{ padding: '0.85rem 1rem', textAlign: 'center', minWidth: '140px' }}>
+                                                            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                                                                <button onClick={() => markAttendance(student.id, 'present')} title="Mark Present"
+                                                                    style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', background: todayRecord?.status === 'present' ? '#16a34a' : '#dcfce7', color: todayRecord?.status === 'present' ? 'white' : '#16a34a', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}>
+                                                                    ✓ P
+                                                                </button>
+                                                                <button onClick={() => markAttendance(student.id, 'absent')} title="Mark Absent"
+                                                                    style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', background: todayRecord?.status === 'absent' ? '#dc2626' : '#fee2e2', color: todayRecord?.status === 'absent' ? 'white' : '#dc2626', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}>
+                                                                    ✗ A
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                        <td style={{ padding: '0.85rem 1rem', minWidth: '130px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                                <div style={{ flex: 1, height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+                                                                    <div style={{ width: `${pct}%`, height: '100%', background: pctColor, borderRadius: '4px', transition: 'width 0.5s ease' }} />
+                                                                </div>
+                                                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: pctColor, minWidth: '38px' }}>{pct}%</span>
+                                                            </div>
+                                                            <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem' }}>
+                                                                {student.attendance?.present || 0}P / {student.attendance?.absent || 0}A / {student.attendance?.total || 0} days
+                                                            </div>
+                                                        </td>
+                                                        <td style={{ padding: '0.85rem 1rem' }}>
+                                                            <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', maxWidth: '360px' }}>
+                                                                {records.slice(0, 10).map(r => (
+                                                                    <span key={r.date} title={`${r.date} — click to remove`}
+                                                                        onClick={() => openConfirm('Remove Record', `Remove attendance record for ${student.name} on ${r.date}?`, () => removeAttendanceRecord(student.id, r.date), false)}
+                                                                        style={{
+                                                                            padding: '0.15rem 0.5rem', borderRadius: '999px', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer',
+                                                                            background: r.status === 'present' ? '#dcfce7' : '#fee2e2',
+                                                                            color: r.status === 'present' ? '#15803d' : '#dc2626',
+                                                                            border: `1px solid ${r.status === 'present' ? '#86efac' : '#fca5a5'}`
+                                                                        }}>
+                                                                        {r.date.slice(5)} {r.status === 'present' ? '✓' : '✗'}
+                                                                    </span>
+                                                                ))}
+                                                                {records.length > 10 && <span style={{ fontSize: '0.68rem', color: '#94a3b8', padding: '0.15rem 0.4rem' }}>+{records.length - 10} more</span>}
+                                                                {records.length === 0 && <span style={{ fontSize: '0.78rem', color: '#cbd5e1', fontStyle: 'italic' }}>No records yet</span>}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {/* ========== FEES TAB ========== */}
                     {activeTab === 'fees' && (() => {
@@ -3539,10 +3725,15 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                                             <td style={{ padding: '0.75rem', color: '#64748b' }}>{student.admissions?.[0]?.contact || '—'}</td>
                                                             <td style={{ padding: '0.75rem' }}>
                                                                 <button onClick={() => {
-                                                                    if (window.confirm(`Delete ${student.name}? This cannot be undone.`)) {
-                                                                        const newStudents = students.filter(s => s.id !== student.id);
-                                                                        setStudents(newStudents);
-                                                                    }
+                                                                    openConfirm(
+                                                                        '🗑 Delete Student',
+                                                                        `Are you sure you want to permanently delete "${student.name}" (${student.id})? All their records including marks, attendance and fee history will be lost. This cannot be undone.`,
+                                                                        async () => {
+                                                                            const newStudents = students.filter(s => s.id !== student.id);
+                                                                            await setStudents(newStudents);
+                                                                            showSaveMessage(`${student.name} deleted.`);
+                                                                        }
+                                                                    );
                                                                 }} className="btn icon-btn" style={{ color: '#ef4444' }} title="Delete Student">
                                                                     <Trash2 size={16} />
                                                                 </button>

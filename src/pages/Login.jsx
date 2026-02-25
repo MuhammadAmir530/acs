@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { LogIn, User, Lock, AlertCircle } from 'lucide-react';
-import { adminCredentials, developerCredentials } from '../data/schoolData';
+import { developerCredentials } from '../data/schoolData';
 import { useSchoolData } from '../context/SchoolDataContext';
 
 const Login = ({ setIsLoggedIn, setIsAdmin, setIsDeveloper, setCurrentPage, setLoggedInStudent }) => {
-    const { schoolData } = useSchoolData();
+    const { schoolData, adminCredentials } = useSchoolData();
     const [loginType, setLoginType] = useState('student'); // 'student', 'admin', or 'developer'
     const [credentials, setCredentials] = useState({
         username: '',
@@ -25,8 +25,12 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setIsDeveloper, setCurrentPage, setL
                 setError('Invalid developer credentials');
             }
         } else if (loginType === 'admin') {
-            if (credentials.username === adminCredentials.username &&
-                credentials.password === adminCredentials.password) {
+            // Check against DB credentials (falls back to empty if not loaded yet)
+            if (
+                adminCredentials.username &&
+                credentials.username === adminCredentials.username &&
+                credentials.password === adminCredentials.password
+            ) {
                 setIsAdmin(true);
                 setCurrentPage('admin');
             } else {
@@ -222,29 +226,6 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setIsDeveloper, setCurrentPage, setL
                         Sign In
                     </button>
                 </form>
-
-                {/* Demo Credentials */}
-                <div style={{
-                    marginTop: '2rem',
-                    padding: '1rem',
-                    background: 'var(--color-gray-50)',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: '0.875rem',
-                    color: 'var(--color-gray-600)'
-                }}>
-                    <strong style={{ color: 'var(--color-gray-900)', display: 'block', marginBottom: '0.5rem' }}>
-                        Demo Credentials:
-                    </strong>
-                    <div style={{ marginBottom: '0.5rem' }}>
-                        <strong>Student:</strong> STU001 / demo123
-                    </div>
-                    <div style={{ marginBottom: '0.5rem' }}>
-                        <strong>Admin:</strong> admin / admin123
-                    </div>
-                    <div>
-                        <strong>Developer:</strong> ****** / ******
-                    </div>
-                </div>
             </div>
         </div>
     );

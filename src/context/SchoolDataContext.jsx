@@ -37,9 +37,10 @@ export const SchoolDataProvider = ({ children }) => {
     const [classes, setClasses] = useState(LOCAL_CLASSES);
     const [subjects, setSubjects] = useState(DEFAULT_SUBJECTS);
     const [terms, setTerms] = useState(DEFAULT_TERMS);
-    const [sections, setSections] = useState([]); // New state for sections
+    const [sections, setSections] = useState([]);
     const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
     const [loading, setLoading] = useState(true);
+    const [adminCredentials, setAdminCredentials] = useState({ username: '', password: '' });
 
     const fetchData = async () => {
         try {
@@ -69,7 +70,13 @@ export const SchoolDataProvider = ({ children }) => {
             const { data: students } = await supabase.from('students').select('*');
 
             // 8. Get Blogs
-            const { data: blogs } = await supabase.from('blogs').select('*').order('date', { ascending: false });
+            const { data: blogs } = await supabase.from('blogs').select('*').order('created_at', { ascending: false });
+
+            // 9. Get Admin credentials
+            const { data: admins } = await supabase.from('admins').select('*').eq('role', 'admin').limit(1);
+            if (admins && admins.length > 0) {
+                setAdminCredentials({ username: admins[0].username, password: admins[0].password });
+            }
 
             setData(prev => ({
                 ...prev,
@@ -82,10 +89,9 @@ export const SchoolDataProvider = ({ children }) => {
                 students: (students || []).map(s => ({
                     ...s,
                     photo: s.image,
-                    feeStatus: s.fee_status,
                     feeHistory: s.fee_history || [],
                     previous_results: s.previous_results,
-                    previousResults: s.previous_results, // Fallback for camelCase
+                    previousResults: s.previous_results,
                     serialNumber: s.serial_number
                 }))
             }));
@@ -125,7 +131,6 @@ export const SchoolDataProvider = ({ children }) => {
 
     const setStudents = async (studentsList) => {
         const dbStudents = studentsList.map(s => {
-            // Explicitly extract database fields, filtering out any camelCase React state keys
             return {
                 id: s.id,
                 serial_number: s.serialNumber !== undefined ? s.serialNumber : s.serial_number,
@@ -133,7 +138,6 @@ export const SchoolDataProvider = ({ children }) => {
                 name: s.name,
                 grade: s.grade,
                 image: s.image !== undefined ? s.image : s.photo,
-                fee_status: s.feeStatus !== undefined ? s.feeStatus : s.fee_status,
                 fee_history: s.feeHistory !== undefined ? s.feeHistory : (s.fee_history || []),
                 results: s.results || [],
                 attendance: s.attendance || {},
@@ -186,6 +190,17 @@ export const SchoolDataProvider = ({ children }) => {
         if (!error) setWeights(newWeights);
     };
 
+    const changeAdminPassword = async (newUsername, newPassword) => {
+        const { error } = await supabase
+            .from('admins')
+            .update({ username: newUsername, password: newPassword })
+            .eq('role', 'admin');
+        if (!error) {
+            setAdminCredentials({ username: newUsername, password: newPassword });
+        }
+        return { error };
+    };
+
     return (
         <SchoolDataContext.Provider value={{
             schoolData: data,
@@ -194,6 +209,7 @@ export const SchoolDataProvider = ({ children }) => {
             TERMS: terms,
             SECTIONS: sections,
             WEIGHTS: weights,
+            adminCredentials,
             loading,
             fetchData,
             updateSchoolInfo,
@@ -206,7 +222,8 @@ export const SchoolDataProvider = ({ children }) => {
             updateSubjects,
             updateTerms,
             updateSections,
-            updateWeights
+            updateWeights,
+            changeAdminPassword
         }}>
             {children}
         </SchoolDataContext.Provider>
