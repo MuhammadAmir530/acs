@@ -55,6 +55,7 @@ CREATE TABLE testimonials (
     grade TEXT,
     image TEXT,
     fee_status TEXT,
+    fee_history JSONB DEFAULT '[]',
     results JSONB DEFAULT '[]',
     attendance JSONB DEFAULT '{}',
     previous_results JSONB DEFAULT '[]',

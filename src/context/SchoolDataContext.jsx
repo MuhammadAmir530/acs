@@ -83,6 +83,7 @@ export const SchoolDataProvider = ({ children }) => {
                     ...s,
                     photo: s.image,
                     feeStatus: s.fee_status,
+                    feeHistory: s.fee_history || [],
                     previous_results: s.previous_results,
                     previousResults: s.previous_results, // Fallback for camelCase
                     serialNumber: s.serial_number
@@ -133,6 +134,7 @@ export const SchoolDataProvider = ({ children }) => {
                 grade: s.grade,
                 image: s.image !== undefined ? s.image : s.photo,
                 fee_status: s.feeStatus !== undefined ? s.feeStatus : s.fee_status,
+                fee_history: s.feeHistory !== undefined ? s.feeHistory : (s.fee_history || []),
                 results: s.results || [],
                 attendance: s.attendance || {},
                 previous_results: s.previousResults !== undefined ? s.previousResults : s.previous_results || [],
