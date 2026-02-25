@@ -32,7 +32,8 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     }, [SECTIONS, selectedSectionId]);
 
     // ── Gradebook State ──
-    const [gbTerm, setGbTerm] = useState('');
+    const [gbTerm, setGbTerm] = useState(TERMS[0] || '');
+    const [gbGenderTab, setGbGenderTab] = useState('boys'); // 'boys', 'girls', 'all'
     const [gbEdits, setGbEdits] = useState({});       // { studentId: { subject: obtained } }
     const [gbSaving, setGbSaving] = useState(false);
     const [showGbStats, setShowGbStats] = useState(true);
@@ -80,12 +81,26 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         return { bg: '#fee2e2', text: '#dc2626' };
     };
 
-    // Get the obtained value for a student/subject from edits or saved data
+    // Helper: get results for a specific term from a student's results array
+    const getTermResults = (student, termLabel) => {
+        return (student.results || []).filter(r => r.term === termLabel);
+    };
+
+    // Get the obtained value for a student/subject from edits or saved data (filtered by selected term)
     const getCellValue = (student, subject) => {
         if (gbEdits[student.id] && gbEdits[student.id][subject] !== undefined)
             return gbEdits[student.id][subject];
-        const r = (student.results || []).find(r => r.subject === subject);
+        const termLabel = gbTerm || TERMS[0] || 'Current';
+        const termResults = getTermResults(student, termLabel);
+        const r = termResults.find(r => r.subject === subject);
         return r ? (r.obtained !== undefined ? r.obtained : '') : '';
+    };
+
+    // Helper: filter students by gender for gradebook
+    const filterByGender = (studentsList, genderTab) => {
+        if (genderTab === 'all') return studentsList;
+        const genderVal = genderTab === 'boys' ? 'Male' : 'Female';
+        return studentsList.filter(s => s.admissions?.[0]?.gender === genderVal);
     };
 
     const handleCellEdit = (studentId, subject, value) => {
@@ -98,33 +113,37 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     const saveGradebook = async () => {
         if (Object.keys(gbEdits).length === 0) { showSaveMessage('No changes to save.'); return; }
         setGbSaving(true);
-        const termLabel = gbTerm || 'Current';
+        const termLabel = gbTerm || TERMS[0] || 'Current';
         const classStudents = students.filter(s => s.grade === selectedClass);
         const updatedStudents = classStudents.map(s => {
             if (!gbEdits[s.id]) return s;
-            const newResults = SUBJECTS.map(subject => {
+            // Build new results for this term only
+            const newTermResults = SUBJECTS.map(subject => {
                 const subTotal = getSubjectTotal(subject);
                 const obtained = gbEdits[s.id]?.[subject] !== undefined
                     ? Number(gbEdits[s.id][subject])
-                    : ((s.results || []).find(r => r.subject === subject)?.obtained ?? 0);
+                    : (getTermResults(s, termLabel).find(r => r.subject === subject)?.obtained ?? 0);
                 const pct = Math.round((obtained / subTotal) * 100);
-                const existing = (s.results || []).find(r => r.subject === subject);
+                const existing = getTermResults(s, termLabel).find(r => r.subject === subject);
                 return { subject, total: subTotal, obtained, percentage: pct, grade: calcGrade(pct), remarks: existing?.remarks || '', term: termLabel };
             });
-            return { ...s, results: newResults };
+            // Merge: keep results from OTHER terms, replace results for THIS term
+            const otherTermResults = (s.results || []).filter(r => r.term !== termLabel);
+            return { ...s, results: [...otherTermResults, ...newTermResults] };
         });
         const allStudents = students.map(s => updatedStudents.find(u => u.id === s.id) || s);
         await setStudents(allStudents);
         setGbEdits({});
         setGbSaving(false);
-        showSaveMessage('Gradebook saved!');
+        showSaveMessage(`Gradebook saved for ${termLabel}!`);
     };
 
     const saveRemarks = async (studentId, subject, remarks) => {
+        const termLabel = gbTerm || TERMS[0] || 'Current';
         const updatedStudents = students.map(s => {
             if (s.id !== studentId) return s;
             const newResults = (s.results || []).map(r =>
-                r.subject === subject ? { ...r, remarks } : r
+                (r.subject === subject && r.term === termLabel) ? { ...r, remarks } : r
             );
             return { ...s, results: newResults };
         });
@@ -133,14 +152,17 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
 
     const archiveTerm = async () => {
         const termLabel = gbTerm || TERMS[0];
-        if (!window.confirm(`Archive current marks as "${termLabel}" for ${selectedClass}? This will move current results to history.`)) return;
+        if (!window.confirm(`Archive "${termLabel}" marks for ${selectedClass}? This will move this term's results to history.`)) return;
         const classStudents = students.filter(s => s.grade === selectedClass);
         const updatedStudents = classStudents.map(s => {
-            const historyEntry = { term: termLabel, results: [...(s.results || [])] };
+            const termResults = getTermResults(s, termLabel);
+            const historyEntry = { term: termLabel, results: [...termResults] };
+            // Remove this term's results, keep other terms
+            const remainingResults = (s.results || []).filter(r => r.term !== termLabel);
             return {
                 ...s,
                 previousResults: [...(s.previousResults || []), historyEntry],
-                results: SUBJECTS.map(subject => ({ subject, total: getSubjectTotal(subject), obtained: 0, percentage: 0, grade: 'F', remarks: '' }))
+                results: remainingResults
             };
         });
         const allStudents = students.map(s => updatedStudents.find(u => u.id === s.id) || s);
@@ -195,31 +217,37 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
             XLSX.utils.book_append_sheet(wb, ws, termName.substring(0, 31));
         });
 
-        // Current term sheet
-        const currentResults = {};
-        classStudents.forEach(s => { currentResults[s.id] = s.results || []; });
-        const currentLabel = gbTerm || 'Current';
-        const wsCurrent = XLSX.utils.json_to_sheet(buildSheet(currentResults));
-        XLSX.utils.book_append_sheet(wb, wsCurrent, currentLabel.substring(0, 31));
+        // Per-term sheets for currently active terms (not archived)
+        TERMS.forEach(termName => {
+            if (archivedTermNames.includes(termName)) return; // already exported via archived
+            const termResults = {};
+            classStudents.forEach(s => {
+                termResults[s.id] = getTermResults(s, termName);
+            });
+            // Only add sheet if there's data
+            const hasData = Object.values(termResults).some(r => r.length > 0);
+            if (hasData) {
+                const ws = XLSX.utils.json_to_sheet(buildSheet(termResults));
+                XLSX.utils.book_append_sheet(wb, ws, termName.substring(0, 31));
+            }
+        });
 
-        // Summary sheet: student | Term1 Avg | Term2 Avg | ... | Current Avg | Overall
-        const allTermNames = [...archivedTermNames, currentLabel];
+        // Summary sheet: student | Term1 Avg | Term2 Avg | ... | Overall
+        const allTermNames = [...archivedTermNames, ...TERMS.filter(t => !archivedTermNames.includes(t))];
         const summaryRows = classStudents.map(s => {
-            const row = { 'Student ID': s.id, 'Student Name': s.name };
-            archivedTermNames.forEach(termName => {
+            const row = { 'Student ID': s.id, 'Student Name': s.name, 'Gender': s.admissions?.[0]?.gender || '' };
+            allTermNames.forEach(termName => {
+                // Check archived first, then active
                 const hist = (s.previousResults || []).find(h => h.term === termName);
-                const res = hist ? hist.results : [];
+                const res = hist ? hist.results : getTermResults(s, termName);
                 row[`${termName} Avg%`] = res.length ? calcWeightedAvg(res) : '';
                 row[`${termName} Grade`] = res.length ? calcGrade(calcWeightedAvg(res)) : '';
             });
-            const curRes = s.results || [];
-            row[`${currentLabel} Avg%`] = curRes.length ? calcWeightedAvg(curRes) : '';
-            row[`${currentLabel} Grade`] = curRes.length ? calcGrade(calcWeightedAvg(curRes)) : '';
             // Grand average across all terms
             const allAvgs = allTermNames.map(t => {
-                if (t === currentLabel) return curRes.length ? calcWeightedAvg(curRes) : null;
                 const hist = (s.previousResults || []).find(h => h.term === t);
-                return hist && hist.results.length ? calcWeightedAvg(hist.results) : null;
+                const res = hist ? hist.results : getTermResults(s, t);
+                return res.length ? calcWeightedAvg(res) : null;
             }).filter(v => v !== null);
             row['Grand Avg%'] = allAvgs.length ? Math.round(allAvgs.reduce((a, b) => a + b, 0) / allAvgs.length) : '';
             row['Grand Grade'] = row['Grand Avg%'] !== '' ? calcGrade(row['Grand Avg%']) : '';
@@ -249,23 +277,27 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                 });
             });
             setGbEdits(newEdits);
-            showSaveMessage(`Imported marks for ${Object.keys(newEdits).length} students. Click Save All to apply.`);
+            const termLabel = gbTerm || TERMS[0] || 'Current';
+            showSaveMessage(`Imported marks for ${Object.keys(newEdits).length} students into ${termLabel}. Click Save All to apply.`);
         };
         reader.readAsBinaryString(file);
         e.target.value = '';
     };
 
     const downloadGradebookTemplate = () => {
-        const classStudents = students.filter(s => s.grade === selectedClass);
+        const allClassStudents = students.filter(s => s.grade === selectedClass);
+        const classStudents = filterByGender(allClassStudents, gbGenderTab);
+        const termLabel = gbTerm || TERMS[0] || 'Current';
+        const genderLabel = gbGenderTab === 'all' ? 'All' : (gbGenderTab === 'boys' ? 'Boys' : 'Girls');
         const rows = classStudents.map(s => {
-            const row = { 'Student ID': s.id, 'Student Name': s.name };
+            const row = { 'Student ID': s.id, 'Student Name': s.name, 'Gender': s.admissions?.[0]?.gender || '' };
             SUBJECTS.forEach(sub => { row[sub] = ''; });
             return row;
         });
         const ws = XLSX.utils.json_to_sheet(rows);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Marks Template');
-        XLSX.writeFile(wb, `Marks_Template_${selectedClass}.xlsx`);
+        XLSX.writeFile(wb, `Marks_Template_${selectedClass}_${termLabel}_${genderLabel}.xlsx`);
     };
 
 
@@ -1093,7 +1125,10 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         const student = students.find(s => s.id === studentId);
         if (!student) return;
 
-        const avg = (student.results.reduce((sum, r) => sum + r.percentage, 0) / student.results.length).toFixed(1);
+        const allResults = student.results || [];
+        const avg = allResults.length > 0
+            ? (allResults.reduce((sum, r) => sum + r.percentage, 0) / allResults.length).toFixed(1)
+            : '0.0';
         const overallGrade = percentageToGrade(parseFloat(avg));
         const gradeColor = (pct) => pct >= 90 ? '#0d7c52' : pct >= 75 ? '#1a5fb4' : pct >= 60 ? '#c4841d' : '#c0392b';
         const gradeBg = (pct) => pct >= 90 ? '#e6f9f0' : pct >= 75 ? '#e8f0fc' : pct >= 60 ? '#fef5e7' : '#fce8e6';
@@ -1103,25 +1138,41 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         const schoolPhone = schoolData.contact?.phone || '';
         const schoolEmail = schoolData.contact?.email || '';
 
-        const resultsRows = student.results.map((r, i) => `
-            <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-                <td style="padding:12px 16px;border-bottom:1px solid #edf2f7;font-size:13px;font-weight:500;color:#2d3748;">${r.subject}</td>
-                <td style="padding:12px 16px;border-bottom:1px solid #edf2f7;text-align:center;">
-                    <span style="display:inline-block;padding:4px 14px;border-radius:20px;font-weight:700;font-size:13px;background:${gradeBg(r.percentage)};color:${gradeColor(r.percentage)};">${r.percentage}%</span>
-                </td>
-                <td style="padding:12px 16px;border-bottom:1px solid #edf2f7;text-align:center;">
-                    <span style="display:inline-block;width:36px;height:36px;line-height:36px;border-radius:50%;font-weight:800;font-size:14px;background:${gradeBg(r.percentage)};color:${gradeColor(r.percentage)};text-align:center;">${r.grade}</span>
-                </td>
-                <td style="padding:12px 16px;border-bottom:1px solid #edf2f7;">
-                    <div style="display:flex;align-items:center;gap:10px;">
-                        <div style="flex:1;background:#edf2f7;border-radius:20px;height:8px;overflow:hidden;">
-                            <div style="background:linear-gradient(90deg,${gradeColor(r.percentage)},${gradeColor(r.percentage)}cc);height:100%;width:${r.percentage}%;border-radius:20px;transition:width 0.5s;"></div>
+        // Group results by term
+        const termGroups = {};
+        allResults.forEach(r => {
+            const term = r.term || 'Current';
+            if (!termGroups[term]) termGroups[term] = [];
+            termGroups[term].push(r);
+        });
+
+        const resultsRows = Object.entries(termGroups).map(([termName, termResults]) => {
+            const termHeader = `
+                <tr style="background:linear-gradient(135deg,#1e3a5f,#2563eb);">
+                    <td colspan="4" style="padding:10px 16px;font-size:13px;font-weight:800;color:#fff;letter-spacing:0.5px;">📋 ${termName}</td>
+                </tr>
+            `;
+            const rows = termResults.map((r, i) => `
+                <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+                    <td style="padding:12px 16px;border-bottom:1px solid #edf2f7;font-size:13px;font-weight:500;color:#2d3748;">${r.subject}</td>
+                    <td style="padding:12px 16px;border-bottom:1px solid #edf2f7;text-align:center;">
+                        <span style="display:inline-block;padding:4px 14px;border-radius:20px;font-weight:700;font-size:13px;background:${gradeBg(r.percentage)};color:${gradeColor(r.percentage)};">${r.percentage}%</span>
+                    </td>
+                    <td style="padding:12px 16px;border-bottom:1px solid #edf2f7;text-align:center;">
+                        <span style="display:inline-block;width:36px;height:36px;line-height:36px;border-radius:50%;font-weight:800;font-size:14px;background:${gradeBg(r.percentage)};color:${gradeColor(r.percentage)};text-align:center;">${r.grade}</span>
+                    </td>
+                    <td style="padding:12px 16px;border-bottom:1px solid #edf2f7;">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <div style="flex:1;background:#edf2f7;border-radius:20px;height:8px;overflow:hidden;">
+                                <div style="background:linear-gradient(90deg,${gradeColor(r.percentage)},${gradeColor(r.percentage)}cc);height:100%;width:${r.percentage}%;border-radius:20px;transition:width 0.5s;"></div>
+                            </div>
+                            <span style="font-size:11px;color:#a0aec0;font-weight:600;min-width:28px;">${r.percentage}</span>
                         </div>
-                        <span style="font-size:11px;color:#a0aec0;font-weight:600;min-width:28px;">${r.percentage}</span>
-                    </div>
-                </td>
-            </tr>
-        `).join('');
+                    </td>
+                </tr>
+            `).join('');
+            return termHeader + rows;
+        }).join('');
 
         let previousSection = '';
         if (student.previousResults && student.previousResults.length > 0) {
@@ -1987,13 +2038,15 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
 
                     {/* ========== GRADEBOOK TAB ========== */}
                     {activeTab === 'marks' && (() => {
-                        const classStudents = students.filter(s => s.grade === selectedClass);
-                        // Compute stats
-                        // Compute stats
+                        const allClassStudents = students.filter(s => s.grade === selectedClass);
+                        const classStudents = filterByGender(allClassStudents, gbGenderTab);
+                        const termLabel = gbTerm || TERMS[0] || 'Current';
+                        // Compute stats using term-specific results
                         const subjectStats = SUBJECTS.map(sub => {
                             const subTotal = getSubjectTotal(sub);
                             const vals = classStudents.map(s => {
-                                const r = (s.results || []).find(r => r.subject === sub);
+                                const termResults = getTermResults(s, termLabel);
+                                const r = termResults.find(r => r.subject === sub);
                                 const edited = gbEdits[s.id]?.[sub];
                                 const obtained = edited !== undefined ? Number(edited) : (r?.obtained ?? null);
                                 return obtained !== null ? Math.round((obtained / subTotal) * 100) : null;
@@ -2005,16 +2058,20 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                         });
                         const overallAvg = classStudents.length ? Math.round(
                             classStudents.reduce((sum, s) => {
-                                const res = s.results || [];
+                                const res = getTermResults(s, termLabel);
                                 const pct = calcOverallPct(res);
                                 return sum + pct;
                             }, 0) / classStudents.length
                         ) : 0;
                         const passCount = classStudents.filter(s => {
-                            const res = s.results || [];
+                            const res = getTermResults(s, termLabel);
                             const pct = calcOverallPct(res);
                             return pct >= 40;
                         }).length;
+
+                        // Gender counts for tabs
+                        const boysCount = allClassStudents.filter(s => s.admissions?.[0]?.gender === 'Male').length;
+                        const girlsCount = allClassStudents.filter(s => s.admissions?.[0]?.gender === 'Female').length;
 
                         return (
                             <div className="animate-fade-in">
@@ -2025,7 +2082,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginBottom: '1.25rem' }}>
                                     <div>
                                         <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>📊 Gradebook</h2>
-                                        <p style={{ color: '#64748b', fontSize: '0.85rem', margin: 0 }}>Spreadsheet-style marks entry for the whole class</p>
+                                        <p style={{ color: '#64748b', fontSize: '0.85rem', margin: 0 }}>Spreadsheet-style marks entry — separated by term and gender</p>
                                     </div>
                                     <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                                         {/* Class */}
@@ -2034,9 +2091,8 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                             {CLASSES.map(c => <option key={c}>{c}</option>)}
                                         </select>
                                         {/* Term label */}
-                                        <select className="form-input" style={{ padding: '0.4rem 0.75rem' }} value={gbTerm}
-                                            onChange={e => setGbTerm(e.target.value)}>
-                                            <option value="">Current (Unsaved)</option>
+                                        <select className="form-input" style={{ padding: '0.4rem 0.75rem', fontWeight: 700 }} value={gbTerm}
+                                            onChange={e => { setGbTerm(e.target.value); setGbEdits({}); }}>
                                             {TERMS.map(t => <option key={t} value={t}>{t}</option>)}
                                         </select>
 
@@ -2157,6 +2213,59 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                         </div>
                                     </div>
                                 )}
+
+                                {/* ── Gender Tabs ── */}
+                                <div style={{
+                                    display: 'flex',
+                                    gap: '0',
+                                    marginBottom: '1.25rem',
+                                    borderBottom: '2px solid #e2e8f0',
+                                    background: 'white',
+                                    borderRadius: '12px 12px 0 0',
+                                    overflow: 'hidden',
+                                    border: '1px solid #e2e8f0'
+                                }}>
+                                    {[
+                                        { id: 'boys', label: '👦 Boys', count: boysCount, color: '#0369a1', bg: '#e0f2fe' },
+                                        { id: 'girls', label: '👧 Girls', count: girlsCount, color: '#be185d', bg: '#fce7f3' },
+                                        { id: 'all', label: '👥 All Students', count: allClassStudents.length, color: '#475569', bg: '#f1f5f9' }
+                                    ].map(tab => (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setGbGenderTab(tab.id)}
+                                            style={{
+                                                flex: 1,
+                                                padding: '0.85rem 1rem',
+                                                fontWeight: gbGenderTab === tab.id ? 800 : 600,
+                                                fontSize: '0.9rem',
+                                                color: gbGenderTab === tab.id ? tab.color : '#94a3b8',
+                                                background: gbGenderTab === tab.id ? tab.bg : 'transparent',
+                                                border: 'none',
+                                                borderBottom: gbGenderTab === tab.id ? `3px solid ${tab.color}` : '3px solid transparent',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s ease',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '0.4rem'
+                                            }}
+                                        >
+                                            {tab.label}
+                                            <span style={{
+                                                background: gbGenderTab === tab.id ? tab.color : '#cbd5e1',
+                                                color: 'white',
+                                                borderRadius: '999px',
+                                                padding: '0.1rem 0.5rem',
+                                                fontSize: '0.72rem',
+                                                fontWeight: 700,
+                                                minWidth: '22px',
+                                                textAlign: 'center'
+                                            }}>
+                                                {tab.count}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
 
                                 {/* ── Class Statistics ── */}
                                 <div style={{ marginBottom: '1.25rem' }}>

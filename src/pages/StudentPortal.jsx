@@ -7,9 +7,10 @@ import {
 import { useSchoolData } from '../context/SchoolDataContext';
 
 const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStudent }) => {
-    const { schoolData } = useSchoolData();
+    const { schoolData, TERMS } = useSchoolData();
     const [activeTab, setActiveTab] = useState('overview');
     const [selectedPrevTerm, setSelectedPrevTerm] = useState(0);
+    const [selectedTerm, setSelectedTerm] = useState(TERMS[0] || '');
 
     const handleLogout = () => {
         setIsLoggedIn(false);
@@ -23,15 +24,23 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
     const studentsData = schoolData?.students;
     const liveStudent = studentsData ? studentsData.find(s => s.id === student.id) || student : student;
 
-    // Calculate grade average
-    const avgPercentage = (
-        liveStudent.results.reduce((sum, r) => sum + r.percentage, 0) / liveStudent.results.length
-    ).toFixed(1);
+    // Get results for a specific term
+    const getTermResults = (termLabel) => {
+        return (liveStudent.results || []).filter(r => r.term === termLabel);
+    };
 
-    // Best & weakest subjects
-    const sortedResults = [...liveStudent.results].sort((a, b) => b.percentage - a.percentage);
-    const bestSubject = sortedResults[0];
-    const weakestSubject = sortedResults[sortedResults.length - 1];
+    // Get results for the currently selected term (or all if none selected)
+    const currentTermResults = selectedTerm ? getTermResults(selectedTerm) : (liveStudent.results || []);
+
+    // Calculate grade average for selected term
+    const avgPercentage = currentTermResults.length > 0
+        ? (currentTermResults.reduce((sum, r) => sum + r.percentage, 0) / currentTermResults.length).toFixed(1)
+        : '0.0';
+
+    // Best & weakest subjects for selected term
+    const sortedResults = [...currentTermResults].sort((a, b) => b.percentage - a.percentage);
+    const bestSubject = sortedResults[0] || { subject: 'N/A', percentage: 0, obtained: 0, total: 100, grade: '-' };
+    const weakestSubject = sortedResults[sortedResults.length - 1] || { subject: 'N/A', percentage: 0, obtained: 0, total: 100, grade: '-' };
 
     // Attendance ring helpers
     const attendancePercent = liveStudent.attendance.percentage;
@@ -48,12 +57,12 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
         return '#ef4444';
     };
 
-    // Trend arrow between previous term and current
+    // Trend arrow between previous term and current selected term
     const getTrend = (subject) => {
         const prev = liveStudent.previousResults;
         if (!prev || prev.length === 0) return null;
         const lastTerm = prev[prev.length - 1].results.find(r => r.subject === subject);
-        const current = liveStudent.results.find(r => r.subject === subject);
+        const current = currentTermResults.find(r => r.subject === subject);
         if (!lastTerm || !current) return null;
         const diff = current.percentage - lastTerm.percentage;
         if (diff > 0) return { icon: ArrowUp, color: '#10b981', diff: `+${diff}%` };
@@ -274,13 +283,13 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                                         📊 Subject Performance
                                     </h2>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                                        {liveStudent.results.map((result, idx) => {
+                                        {currentTermResults.map((result, idx) => {
                                             const trend = getTrend(result.subject);
                                             return (
                                                 <div key={idx} style={{
                                                     display: 'flex', alignItems: 'center', gap: '1rem',
                                                     padding: '0.65rem 0',
-                                                    borderBottom: idx < liveStudent.results.length - 1 ? '1px solid #f1f5f9' : 'none'
+                                                    borderBottom: idx < currentTermResults.length - 1 ? '1px solid #f1f5f9' : 'none'
                                                 }}>
                                                     <div style={{ width: '120px', fontWeight: 600, fontSize: '0.95rem', color: '#334155' }}>
                                                         {result.subject}
@@ -382,9 +391,37 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                     {activeTab === 'results' && (
                         <div className="animate-fade-in">
                             <h2 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '0.5rem', color: '#1e293b' }}>
-                                📝 Current Term Results
+                                📝 Term Results
                             </h2>
-                            <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>Your latest academic performance across all subjects</p>
+                            <p style={{ color: '#64748b', marginBottom: '1rem' }}>Your academic performance separated by term</p>
+
+                            {/* Term selector */}
+                            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                                {TERMS.map(t => {
+                                    const termRes = getTermResults(t);
+                                    const hasData = termRes.length > 0;
+                                    return (
+                                        <button
+                                            key={t}
+                                            onClick={() => setSelectedTerm(t)}
+                                            style={{
+                                                padding: '0.6rem 1.5rem',
+                                                borderRadius: '999px',
+                                                fontWeight: 700,
+                                                fontSize: '0.9rem',
+                                                border: selectedTerm === t ? '2px solid #2563eb' : '2px solid #e2e8f0',
+                                                background: selectedTerm === t ? '#2563eb' : 'white',
+                                                color: selectedTerm === t ? 'white' : '#475569',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s ease',
+                                                opacity: hasData ? 1 : 0.5
+                                            }}
+                                        >
+                                            {t} {hasData ? `(${termRes.length})` : '(No data)'}
+                                        </button>
+                                    );
+                                })}
+                            </div>
 
                             {/* Summary bar */}
                             <div style={{
@@ -414,7 +451,7 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                                 gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                                 gap: '1.25rem'
                             }}>
-                                {liveStudent.results.map((result, idx) => {
+                                {currentTermResults.length > 0 ? currentTermResults.map((result, idx) => {
                                     const trend = getTrend(result.subject);
                                     return (
                                         <div key={idx} style={{
@@ -478,7 +515,19 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                                             )}
                                         </div>
                                     );
-                                })}
+                                }) : (
+                                    <div style={{
+                                        ...cardStyle,
+                                        textAlign: 'center',
+                                        padding: '3rem',
+                                        color: '#94a3b8',
+                                        gridColumn: '1 / -1'
+                                    }}>
+                                        <Award size={48} style={{ margin: '0 auto 1rem', color: '#cbd5e1' }} />
+                                        <p style={{ fontWeight: 600 }}>No results available for {selectedTerm} yet.</p>
+                                        <p style={{ fontSize: '0.85rem' }}>Results will appear here once your teacher enters marks for this term.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
