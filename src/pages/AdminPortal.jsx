@@ -4,7 +4,8 @@ import {
     Save, CheckCircle, XCircle, Edit3, User,
     Download, Upload, FileText, Search, Camera,
     BellPlus, Trash2, Megaphone, PlusCircle, Lock,
-    Building, School, Check, X, ChevronRight, Layout
+    Building, School, Check, X, ChevronRight, Layout,
+    GripVertical, ChevronUp, ChevronDown
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useSchoolData } from '../context/SchoolDataContext';
@@ -338,6 +339,8 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     const [selectedClassForList, setSelectedClassForList] = useState(CLASSES[0]);
     const [classListSearch, setClassListSearch] = useState('');
     const [newClassName, setNewClassName] = useState('');
+    const [editingSectionId, setEditingSectionId] = useState(null);
+    const [editingSectionName, setEditingSectionName] = useState('');
     const classImportFileRef = useRef(null);
 
     const students = schoolData.students || [];
@@ -1831,8 +1834,17 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
 
 
     const exportClassRoster = () => {
-        const classStudents = students.filter(s => s.grade === selectedClassForList);
-        if (classStudents.length === 0) { alert('No students in this class!'); return; }
+        const classStudents = students.filter(s =>
+            s.grade === selectedClassForList &&
+            (classDetailTab === 'all' || s.admissions?.[0]?.gender === (classDetailTab === 'boys' ? 'Male' : 'Female'))
+        );
+        const suffix = classDetailTab === 'all' ? 'All' : (classDetailTab === 'boys' ? 'Boys' : 'Girls');
+
+        if (classStudents.length === 0) {
+            alert(`No ${suffix.toLowerCase()} in this class!`);
+            return;
+        }
+
         const exportData = classStudents.map(s => {
             const adm = s.admissions?.[0] || {};
             return {
@@ -1847,9 +1859,10 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         });
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, selectedClassForList);
-        XLSX.writeFile(wb, `Class_${selectedClassForList}_Roster_${new Date().toISOString().split('T')[0]}.xlsx`);
-        showSaveMessage(`Exported ${classStudents.length} students!`);
+        // Sheet names have a max limit of 31 chars in Excel
+        XLSX.utils.book_append_sheet(wb, ws, `${selectedClassForList} ${suffix}`.substring(0, 31));
+        XLSX.writeFile(wb, `Class_${selectedClassForList}_${suffix}_Roster_${new Date().toISOString().split('T')[0]}.xlsx`);
+        showSaveMessage(`Exported ${classStudents.length} ${suffix.toLowerCase()}!`);
     };
 
     // Common button style for Excel buttons
@@ -2039,7 +2052,8 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                     {/* ========== GRADEBOOK TAB ========== */}
                     {activeTab === 'marks' && (() => {
                         const allClassStudents = students.filter(s => s.grade === selectedClass);
-                        const classStudents = filterByGender(allClassStudents, gbGenderTab);
+                        const classStudents = filterByGender(allClassStudents, gbGenderTab)
+                            .slice().sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
                         const termLabel = gbTerm || TERMS[0] || 'Current';
                         // Compute stats using term-specific results
                         const subjectStats = SUBJECTS.map(sub => {
@@ -3324,6 +3338,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                             <tbody>
                                                 {students
                                                     .filter(s => s.grade === viewingClass && (classDetailTab === 'all' || s.admissions?.[0]?.gender === (classDetailTab === 'boys' ? 'Male' : 'Female')))
+                                                    .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
                                                     .map(student => (
                                                         <tr key={student.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                                             <td style={{ padding: '0.75rem', fontWeight: 600 }}>{student.id}</td>
@@ -3403,27 +3418,156 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                         </div>
                                     </div>
 
-                                    {/* Section Tabs */}
-                                    <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0', marginBottom: '1.5rem' }}>
-                                        {(SECTIONS || []).map(sec => (
-                                            <button
+                                    {/* Section Tabs — Reorderable & Editable */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0', marginBottom: '1.5rem' }}>
+                                        {(SECTIONS || []).map((sec, idx) => (
+                                            <div
                                                 key={sec.id}
-                                                onClick={() => setSelectedSectionId(sec.id)}
                                                 style={{
-                                                    padding: '0.6rem 1.2rem',
-                                                    borderRadius: '8px',
-                                                    fontWeight: 600,
-                                                    background: selectedSectionId === sec.id ? 'var(--color-primary)' : 'white',
-                                                    color: selectedSectionId === sec.id ? 'white' : '#64748b',
-                                                    border: '1px solid',
-                                                    borderColor: selectedSectionId === sec.id ? 'var(--color-primary)' : '#e2e8f0',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.5rem',
+                                                    padding: '0.5rem 0.75rem',
+                                                    borderRadius: '10px',
+                                                    background: selectedSectionId === sec.id ? 'linear-gradient(135deg, var(--color-primary), #3b82f6)' : '#f8fafc',
+                                                    border: selectedSectionId === sec.id ? 'none' : '1px solid #e2e8f0',
                                                     cursor: 'pointer',
-                                                    whiteSpace: 'nowrap',
-                                                    transition: 'all 0.2s'
+                                                    transition: 'all 0.2s ease',
+                                                    boxShadow: selectedSectionId === sec.id ? '0 2px 8px rgba(37,99,235,0.25)' : 'none'
                                                 }}
+                                                onClick={() => setSelectedSectionId(sec.id)}
                                             >
-                                                {sec.name}
-                                            </button>
+                                                {/* Grip handle */}
+                                                <GripVertical size={16} style={{ color: selectedSectionId === sec.id ? 'rgba(255,255,255,0.5)' : '#94a3b8', flexShrink: 0 }} />
+
+                                                {/* Section name or edit input */}
+                                                {editingSectionId === sec.id ? (
+                                                    <input
+                                                        type="text"
+                                                        value={editingSectionName}
+                                                        onChange={e => setEditingSectionName(e.target.value)}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter' && editingSectionName.trim()) {
+                                                                const updatedSections = SECTIONS.map(s => s.id === sec.id ? { ...s, name: editingSectionName.trim() } : s);
+                                                                updateSections(updatedSections);
+                                                                setEditingSectionId(null);
+                                                                showSaveMessage(`Section renamed to "${editingSectionName.trim()}"!`);
+                                                            }
+                                                            if (e.key === 'Escape') setEditingSectionId(null);
+                                                        }}
+                                                        onBlur={() => {
+                                                            if (editingSectionName.trim() && editingSectionName.trim() !== sec.name) {
+                                                                const updatedSections = SECTIONS.map(s => s.id === sec.id ? { ...s, name: editingSectionName.trim() } : s);
+                                                                updateSections(updatedSections);
+                                                                showSaveMessage(`Section renamed to "${editingSectionName.trim()}"!`);
+                                                            }
+                                                            setEditingSectionId(null);
+                                                        }}
+                                                        onClick={e => e.stopPropagation()}
+                                                        autoFocus
+                                                        style={{
+                                                            flex: 1,
+                                                            padding: '0.3rem 0.5rem',
+                                                            borderRadius: '6px',
+                                                            border: '2px solid #3b82f6',
+                                                            fontSize: '0.9rem',
+                                                            fontWeight: 700,
+                                                            outline: 'none',
+                                                            background: 'white'
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <span style={{
+                                                        flex: 1,
+                                                        fontWeight: 700,
+                                                        fontSize: '0.95rem',
+                                                        color: selectedSectionId === sec.id ? 'white' : '#334155',
+                                                        letterSpacing: '0.01em'
+                                                    }}>
+                                                        {sec.name}
+                                                        <span style={{
+                                                            marginLeft: '0.5rem',
+                                                            fontSize: '0.75rem',
+                                                            fontWeight: 600,
+                                                            opacity: 0.7,
+                                                            color: selectedSectionId === sec.id ? 'rgba(255,255,255,0.8)' : '#94a3b8'
+                                                        }}>
+                                                            ({sec.classes.length} classes)
+                                                        </span>
+                                                    </span>
+                                                )}
+
+                                                {/* Action buttons */}
+                                                <div style={{ display: 'flex', gap: '0.2rem', alignItems: 'center', flexShrink: 0 }}>
+                                                    {/* Edit name */}
+                                                    <button
+                                                        onClick={e => {
+                                                            e.stopPropagation();
+                                                            setEditingSectionId(sec.id);
+                                                            setEditingSectionName(sec.name);
+                                                        }}
+                                                        title="Rename section"
+                                                        style={{
+                                                            background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem',
+                                                            borderRadius: '4px', display: 'flex', alignItems: 'center',
+                                                            color: selectedSectionId === sec.id ? 'rgba(255,255,255,0.7)' : '#94a3b8',
+                                                            transition: 'color 0.15s'
+                                                        }}
+                                                        onMouseEnter={e => e.currentTarget.style.color = selectedSectionId === sec.id ? 'white' : '#3b82f6'}
+                                                        onMouseLeave={e => e.currentTarget.style.color = selectedSectionId === sec.id ? 'rgba(255,255,255,0.7)' : '#94a3b8'}
+                                                    >
+                                                        <Edit3 size={14} />
+                                                    </button>
+
+                                                    {/* Move up */}
+                                                    <button
+                                                        onClick={e => {
+                                                            e.stopPropagation();
+                                                            if (idx === 0) return;
+                                                            const updated = [...SECTIONS];
+                                                            [updated[idx - 1], updated[idx]] = [updated[idx], updated[idx - 1]];
+                                                            updateSections(updated);
+                                                        }}
+                                                        disabled={idx === 0}
+                                                        title="Move up"
+                                                        style={{
+                                                            background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', padding: '0.25rem',
+                                                            borderRadius: '4px', display: 'flex', alignItems: 'center',
+                                                            opacity: idx === 0 ? 0.3 : 1,
+                                                            color: selectedSectionId === sec.id ? 'rgba(255,255,255,0.7)' : '#94a3b8',
+                                                            transition: 'color 0.15s'
+                                                        }}
+                                                        onMouseEnter={e => { if (idx > 0) e.currentTarget.style.color = selectedSectionId === sec.id ? 'white' : '#3b82f6'; }}
+                                                        onMouseLeave={e => e.currentTarget.style.color = selectedSectionId === sec.id ? 'rgba(255,255,255,0.7)' : '#94a3b8'}
+                                                    >
+                                                        <ChevronUp size={16} />
+                                                    </button>
+
+                                                    {/* Move down */}
+                                                    <button
+                                                        onClick={e => {
+                                                            e.stopPropagation();
+                                                            if (idx === SECTIONS.length - 1) return;
+                                                            const updated = [...SECTIONS];
+                                                            [updated[idx], updated[idx + 1]] = [updated[idx + 1], updated[idx]];
+                                                            updateSections(updated);
+                                                        }}
+                                                        disabled={idx === SECTIONS.length - 1}
+                                                        title="Move down"
+                                                        style={{
+                                                            background: 'none', border: 'none', cursor: idx === SECTIONS.length - 1 ? 'default' : 'pointer', padding: '0.25rem',
+                                                            borderRadius: '4px', display: 'flex', alignItems: 'center',
+                                                            opacity: idx === SECTIONS.length - 1 ? 0.3 : 1,
+                                                            color: selectedSectionId === sec.id ? 'rgba(255,255,255,0.7)' : '#94a3b8',
+                                                            transition: 'color 0.15s'
+                                                        }}
+                                                        onMouseEnter={e => { if (idx < SECTIONS.length - 1) e.currentTarget.style.color = selectedSectionId === sec.id ? 'white' : '#3b82f6'; }}
+                                                        onMouseLeave={e => e.currentTarget.style.color = selectedSectionId === sec.id ? 'rgba(255,255,255,0.7)' : '#94a3b8'}
+                                                    >
+                                                        <ChevronDown size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
                                         ))}
                                     </div>
 
