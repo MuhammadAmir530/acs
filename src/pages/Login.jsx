@@ -5,65 +5,52 @@ import { useSchoolData } from '../context/SchoolDataContext';
 
 const Login = ({ setIsLoggedIn, setIsAdmin, setIsDeveloper, setCurrentPage, setLoggedInStudent }) => {
     const { schoolData, adminCredentials } = useSchoolData();
-    const [loginType, setLoginType] = useState('student'); // 'student', 'admin', or 'developer'
-    const [credentials, setCredentials] = useState({
-        username: '',
-        password: ''
-    });
+    const [credentials, setCredentials] = useState({ username: '', password: '' });
     const [error, setError] = useState('');
 
     const handleSubmit = (e) => {
         e.preventDefault();
         setError('');
 
-        if (loginType === 'developer') {
-            if (credentials.username === developerCredentials.username &&
-                credentials.password === developerCredentials.password) {
-                setIsDeveloper(true);
-                setCurrentPage('developer');
-            } else {
-                setError('Invalid developer credentials');
-            }
-        } else if (loginType === 'admin') {
-            // Check against DB credentials (falls back to empty if not loaded yet)
-            if (
-                adminCredentials.username &&
-                credentials.username === adminCredentials.username &&
-                credentials.password === adminCredentials.password
-            ) {
-                setIsAdmin(true);
-                setCurrentPage('admin');
-            } else {
-                setError('Invalid admin credentials');
-            }
-        } else {
-            const student = schoolData.students.find(
-                s => s.id === credentials.username && s.password === credentials.password
-            );
+        const { username, password } = credentials;
 
-            if (student) {
-                setIsLoggedIn(true);
-                setLoggedInStudent(student);
-                setCurrentPage('portal');
-            } else {
-                setError('Invalid student credentials');
-            }
+        // 1. Check Developer
+        if (username === developerCredentials.username && password === developerCredentials.password) {
+            setIsDeveloper(true);
+            setCurrentPage('developer');
+            return;
         }
+
+        // 2. Check Admin (from database)
+        if (
+            adminCredentials.username &&
+            username === adminCredentials.username &&
+            password === adminCredentials.password
+        ) {
+            setIsAdmin(true);
+            setCurrentPage('admin');
+            return;
+        }
+
+        // 3. Check Student
+        const student = schoolData.students.find(
+            s => s.id === username && s.password === password
+        );
+        if (student) {
+            setIsLoggedIn(true);
+            setLoggedInStudent(student);
+            setCurrentPage('portal');
+            return;
+        }
+
+        // Nothing matched
+        setError('Invalid credentials. Please check your ID and password.');
     };
 
     const handleChange = (e) => {
-        setCredentials({
-            ...credentials,
-            [e.target.name]: e.target.value
-        });
+        setCredentials({ ...credentials, [e.target.name]: e.target.value });
         setError('');
     };
-
-    const loginTypes = [
-        { id: 'student', label: 'Student' },
-        { id: 'admin', label: 'Admin' },
-        { id: 'developer', label: 'Developer' }
-    ];
 
     return (
         <div style={{
@@ -78,84 +65,50 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setIsDeveloper, setCurrentPage, setL
                 className="card animate-fade-in"
                 style={{
                     width: '100%',
-                    maxWidth: '480px',
+                    maxWidth: '460px',
                     background: 'white',
                     padding: '3rem'
                 }}
             >
+                {/* Icon */}
                 <div className="flex-center" style={{
-                    width: '70px',
-                    height: '70px',
+                    width: '72px',
+                    height: '72px',
                     background: 'var(--gradient-primary)',
                     borderRadius: '50%',
                     color: 'white',
-                    margin: '0 auto 2rem'
+                    margin: '0 auto 1.75rem'
                 }}>
-                    <LogIn size={36} />
+                    <LogIn size={34} />
                 </div>
 
                 <h2 style={{
-                    fontSize: '2rem',
+                    fontSize: '1.9rem',
                     fontWeight: 'var(--font-weight-bold)',
                     textAlign: 'center',
-                    marginBottom: '0.5rem',
+                    marginBottom: '0.4rem',
                     color: 'var(--color-gray-900)'
                 }}>
-                    Portal Login
+                    Welcome Back
                 </h2>
-
                 <p style={{
                     textAlign: 'center',
-                    color: 'var(--color-gray-600)',
-                    marginBottom: '2rem'
+                    color: 'var(--color-gray-500)',
+                    marginBottom: '2rem',
+                    fontSize: '0.95rem'
                 }}>
-                    Access your student, admin, or developer portal
+                    Enter your credentials to access your portal
                 </p>
 
-                {/* Login Type Toggle - 3 way */}
-                <div className="flex gap-2" style={{ marginBottom: '2rem' }}>
-                    {loginTypes.map((type) => (
-                        <button
-                            key={type.id}
-                            onClick={() => {
-                                setLoginType(type.id);
-                                setError('');
-                                setCredentials({ username: '', password: '' });
-                            }}
-                            style={{
-                                flex: 1,
-                                padding: '0.75rem',
-                                borderRadius: 'var(--radius-lg)',
-                                fontWeight: 'var(--font-weight-semibold)',
-                                border: '2px solid',
-                                borderColor: loginType === type.id ? 'var(--color-primary)' : 'var(--color-gray-300)',
-                                background: loginType === type.id ? 'var(--color-primary)' : 'white',
-                                color: loginType === type.id ? 'white' : 'var(--color-gray-700)',
-                                transition: 'all var(--transition-base)',
-                                fontSize: '0.9rem'
-                            }}
-                        >
-                            {type.label}
-                        </button>
-                    ))}
-                </div>
-
                 <form onSubmit={handleSubmit}>
+                    {/* Username */}
                     <div style={{ marginBottom: '1.25rem' }}>
-                        <label className="form-label">
-                            {loginType === 'student' ? 'Student ID' : 'Username'}
-                        </label>
+                        <label className="form-label">Username / Student ID</label>
                         <div style={{ position: 'relative' }}>
-                            <User
-                                size={18}
-                                style={{
-                                    position: 'absolute',
-                                    left: '1rem',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    color: 'var(--color-gray-400)'
-                                }}
-                            />
+                            <User size={18} style={{
+                                position: 'absolute', left: '1rem', top: '50%',
+                                transform: 'translateY(-50%)', color: 'var(--color-gray-400)'
+                            }} />
                             <input
                                 type="text"
                                 name="username"
@@ -164,25 +117,21 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setIsDeveloper, setCurrentPage, setL
                                 className="form-input"
                                 style={{ paddingLeft: '3rem' }}
                                 required
-                                placeholder={loginType === 'student' ? 'STU001' : loginType === 'admin' ? 'admin' : 'developer'}
+                                placeholder="Enter your ID or username"
                                 autoComplete="username"
+                                autoFocus
                             />
                         </div>
                     </div>
 
+                    {/* Password */}
                     <div style={{ marginBottom: '1.5rem' }}>
                         <label className="form-label">Password</label>
                         <div style={{ position: 'relative' }}>
-                            <Lock
-                                size={18}
-                                style={{
-                                    position: 'absolute',
-                                    left: '1rem',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    color: 'var(--color-gray-400)'
-                                }}
-                            />
+                            <Lock size={18} style={{
+                                position: 'absolute', left: '1rem', top: '50%',
+                                transform: 'translateY(-50%)', color: 'var(--color-gray-400)'
+                            }} />
                             <input
                                 type="password"
                                 name="password"
@@ -197,22 +146,21 @@ const Login = ({ setIsLoggedIn, setIsAdmin, setIsDeveloper, setCurrentPage, setL
                         </div>
                     </div>
 
+                    {/* Error */}
                     {error && (
-                        <div
-                            className="animate-fade-in"
-                            style={{
-                                background: 'rgba(239, 68, 68, 0.1)',
-                                border: '1px solid var(--color-danger)',
-                                borderRadius: 'var(--radius-md)',
-                                padding: '0.75rem 1rem',
-                                marginBottom: '1.5rem',
-                                display: 'flex',
-                                gap: '0.5rem',
-                                alignItems: 'center',
-                                color: 'var(--color-danger)'
-                            }}
-                        >
-                            <AlertCircle size={18} />
+                        <div className="animate-fade-in" style={{
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            border: '1px solid var(--color-danger)',
+                            borderRadius: 'var(--radius-md)',
+                            padding: '0.75rem 1rem',
+                            marginBottom: '1.25rem',
+                            display: 'flex',
+                            gap: '0.5rem',
+                            alignItems: 'center',
+                            color: 'var(--color-danger)',
+                            fontSize: '0.9rem'
+                        }}>
+                            <AlertCircle size={17} />
                             <span>{error}</span>
                         </div>
                     )}
