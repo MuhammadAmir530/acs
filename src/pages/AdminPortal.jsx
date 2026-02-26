@@ -460,8 +460,13 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
 
         // 1. Save to Supabase
         try {
-            const nextIdNum = students.length + 1;
             const year = new Date().getFullYear();
+            // Find the max existing ID number to avoid duplicates after deletions
+            const maxNum = students.reduce((max, s) => {
+                const match = s.id?.match(/ACS-\d{4}-(\d+)/);
+                return match ? Math.max(max, parseInt(match[1], 10)) : max;
+            }, 0);
+            const nextIdNum = maxNum + 1;
             const studentId = `ACS-${year}-${nextIdNum.toString().padStart(3, '0')}`;
 
             const newStudentRecord = {
@@ -1865,8 +1870,12 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                         let studentId = providedId;
                         if (!studentId) {
                             const year = new Date().getFullYear();
-                            const count = students.length + newStudents.length + 1;
-                            const seq = String(count).padStart(3, '0');
+                            // Find the max existing ID number to avoid duplicates after deletions
+                            const maxNum = [...students, ...newStudents].reduce((max, s) => {
+                                const match = s.id?.match(/ACS-\d{4}-(\d+)/);
+                                return match ? Math.max(max, parseInt(match[1], 10)) : max;
+                            }, 0);
+                            const seq = String(maxNum + 1).padStart(3, '0');
                             studentId = `ACS-${year}-${seq}`;
                         } else {
                             if (students.some(s => s.id === studentId) || newStudents.some(s => s.id === studentId)) {
