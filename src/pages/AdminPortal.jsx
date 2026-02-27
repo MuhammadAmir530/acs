@@ -17,6 +17,9 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     const [saveMessage, setSaveMessage] = useState('');
     const sectionClasses = (SECTIONS || []).flatMap(s => s.classes || []);
     const [selectedClass, setSelectedClass] = useState(sectionClasses[0] || '');
+    // Per-class subjects: SUBJECTS is now { className: [subject,...] }
+    const classSubjects = (SUBJECTS && !Array.isArray(SUBJECTS) ? (SUBJECTS[selectedClass] || []) : []);
+    const updateClassSubjects = (newList) => updateSubjects({ ...SUBJECTS, [selectedClass]: newList });
     const [reportSearch, setReportSearch] = useState('');
 
     // ── Gradebook State ──
@@ -134,7 +137,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         const updatedStudents = classStudents.map(s => {
             if (!gbEdits[s.id]) return s;
             // Build new results for this term only
-            const newTermResults = SUBJECTS.map(subject => {
+            const newTermResults = classSubjects.map(subject => {
                 const subTotal = getSubjectTotal(subject);
                 const obtained = gbEdits[s.id]?.[subject] !== undefined
                     ? Number(gbEdits[s.id][subject])
@@ -208,7 +211,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
             return classStudents.map(s => {
                 const results = termResults[s.id] || [];
                 const row = { 'Student ID': s.id, 'Student Name': s.name };
-                SUBJECTS.forEach(sub => {
+                SUBJECTS[selectedClass] && SUBJECTS[selectedClass].forEach(sub => {
                     const r = results.find(r => r.subject === sub);
                     row[`${sub} (Marks)`] = r ? r.obtained : '';
                     row[`${sub} (%)`] = r ? r.percentage : '';
@@ -288,7 +291,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                 const studentId = row['Student ID'];
                 if (!studentId) return;
                 newEdits[studentId] = {};
-                SUBJECTS.forEach(sub => {
+                classSubjects.forEach(sub => {
                     if (row[sub] !== undefined) newEdits[studentId][sub] = Number(row[sub]);
                 });
             });
@@ -307,7 +310,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         const genderLabel = gbGenderTab === 'all' ? 'All' : (gbGenderTab === 'boys' ? 'Boys' : 'Girls');
         const rows = classStudents.map(s => {
             const row = { 'Student ID': s.id, 'Student Name': s.name, 'Gender': s.admissions?.[0]?.gender || '' };
-            SUBJECTS.forEach(sub => { row[sub] = ''; });
+            classSubjects.forEach(sub => { row[sub] = ''; });
             return row;
         });
         const ws = XLSX.utils.json_to_sheet(rows);
@@ -2246,7 +2249,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                             .slice().sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
                         const termLabel = gbTerm || TERMS[0] || 'Current';
                         // Compute stats using term-specific results
-                        const subjectStats = SUBJECTS.map(sub => {
+                        const subjectStats = classSubjects.map(sub => {
                             const subTotal = getSubjectTotal(sub);
                             const vals = classStudents.map(s => {
                                 const termResults = getTermResults(s, termLabel);
@@ -2328,24 +2331,25 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                                             {/* Subjects */}
                                             <div>
-                                                <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.5rem' }}>Subjects</div>
+                                                <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.5rem' }}>Subjects <span style={{ fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 400 }}>— for "{selectedClass}" only</span></div>
                                                 <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem' }}>
                                                     <input className="form-input" placeholder="Add subject…" value={newSubjectInput}
                                                         onChange={e => setNewSubjectInput(e.target.value)}
-                                                        onKeyDown={e => { if (e.key === 'Enter' && newSubjectInput.trim()) { updateSubjects([...SUBJECTS, newSubjectInput.trim()]); setNewSubjectInput(''); } }}
+                                                        onKeyDown={e => { if (e.key === 'Enter' && newSubjectInput.trim()) { updateClassSubjects([...classSubjects, newSubjectInput.trim()]); setNewSubjectInput(''); } }}
                                                         style={{ flex: 1, padding: '0.35rem 0.6rem' }} />
                                                     <button className="btn btn-primary" style={{ padding: '0.35rem 0.75rem' }}
-                                                        onClick={() => { if (newSubjectInput.trim()) { updateSubjects([...SUBJECTS, newSubjectInput.trim()]); setNewSubjectInput(''); } }}>
+                                                        onClick={() => { if (newSubjectInput.trim()) { updateClassSubjects([...classSubjects, newSubjectInput.trim()]); setNewSubjectInput(''); } }}>
                                                         <PlusCircle size={14} />
                                                     </button>
                                                 </div>
                                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                                                    {SUBJECTS.map(s => (
+                                                    {classSubjects.map(s => (
                                                         <span key={s} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#e0f2fe', color: '#0369a1', borderRadius: '999px', padding: '0.2rem 0.7rem', fontSize: '0.8rem', fontWeight: 600 }}>
                                                             {s}
-                                                            <button onClick={() => updateSubjects(SUBJECTS.filter(x => x !== s))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0369a1', display: 'flex', alignItems: 'center' }}><X size={12} /></button>
+                                                            <button onClick={() => updateClassSubjects(classSubjects.filter(x => x !== s))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0369a1', display: 'flex', alignItems: 'center' }}><X size={12} /></button>
                                                         </span>
                                                     ))}
+                                                    {classSubjects.length === 0 && <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>No subjects yet. Add one above.</span>}
                                                 </div>
                                             </div>
                                             {/* Terms */}
@@ -2376,7 +2380,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
                                                 <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>📝 Subject Total Marks</div>
                                                 {(() => {
-                                                    const grandTotal = SUBJECTS.reduce((s, sub) => s + getSubjectTotal(sub), 0);
+                                                    const grandTotal = classSubjects.reduce((s, sub) => s + getSubjectTotal(sub), 0);
                                                     return (
                                                         <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1d4ed8', background: '#dbeafe', borderRadius: '999px', padding: '0.15rem 0.6rem' }}>
                                                             Grand Total: {grandTotal} marks
@@ -2386,7 +2390,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                                 <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Leave blank to use 100 per subject</span>
                                             </div>
                                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.5rem' }}>
-                                                {SUBJECTS.map(sub => (
+                                                {classSubjects.map(sub => (
                                                     <div key={sub} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.4rem 0.6rem' }}>
                                                         <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</span>
                                                         <input
@@ -2524,11 +2528,11 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                             </div>
                                         )}
                                         <div style={{ overflowX: 'auto' }}>
-                                            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: `${300 + SUBJECTS.length * 110}px` }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: `${300 + classSubjects.length * 110}px` }}>
                                                 <thead>
                                                     <tr style={{ background: '#1e293b', color: 'white' }}>
                                                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, fontSize: '0.82rem', position: 'sticky', left: 0, background: '#1e293b', zIndex: 2, minWidth: '180px' }}>Student</th>
-                                                        {SUBJECTS.map(sub => (
+                                                        {classSubjects.map(sub => (
                                                             <th key={sub} style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700, fontSize: '0.78rem', minWidth: '100px' }}>
                                                                 {sub}<br /><span style={{ opacity: 0.6, fontWeight: 400 }}>/{getSubjectTotal(sub)}</span>
                                                             </th>
@@ -2541,7 +2545,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                                 <tbody>
                                                     {classStudents.map((student, rowIdx) => {
                                                         // Compute overall % using per-subject totals
-                                                        const subResults = SUBJECTS.map(sub => {
+                                                        const subResults = classSubjects.map(sub => {
                                                             const val = getCellValue(student, sub);
                                                             return val !== '' ? { subject: sub, obtained: Number(val), percentage: Math.round((Number(val) / getSubjectTotal(sub)) * 100) } : null;
                                                         }).filter(Boolean);
@@ -2558,7 +2562,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                                                     <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{student.id}</div>
                                                                 </td>
                                                                 {/* Subject cells */}
-                                                                {SUBJECTS.map(sub => {
+                                                                {classSubjects.map(sub => {
                                                                     const subTotal = getSubjectTotal(sub);
                                                                     const val = getCellValue(student, sub);
                                                                     const pct = val !== '' ? Math.round((Number(val) / subTotal) * 100) : null;
@@ -2605,7 +2609,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                                                         type="text"
                                                                         defaultValue={existingRemark}
                                                                         placeholder="Teacher remarks…"
-                                                                        onBlur={e => saveRemarks(student.id, SUBJECTS[0], e.target.value)}
+                                                                        onBlur={e => saveRemarks(student.id, classSubjects[0], e.target.value)}
                                                                         style={{ width: '100%', padding: '0.3rem 0.5rem', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.78rem', color: '#475569' }}
                                                                     />
                                                                 </td>

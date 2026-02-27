@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { CLASSES as LOCAL_CLASSES } from '../data/schoolData';
 
-const DEFAULT_SUBJECTS = ['Urdu', 'English', 'Mathematics', 'Science', 'Social Studies', 'Islamiyat', 'Computer'];
+// SUBJECTS is now a per-class map: { "className": ["Urdu", "Math", ...] }
+const DEFAULT_SUBJECTS = {};
 const DEFAULT_TERMS = ['Term 1', 'Term 2', 'Final Exam'];
 // SUBJECT_TOTALS stored as WEIGHTS key: { subject: totalMarks } e.g. { "Mathematics": 100, "Physics": 85 }
 // If a subject has no entry, falls back to DEFAULT_SUBJECT_TOTAL (100).
@@ -35,7 +36,7 @@ export const SchoolDataProvider = ({ children }) => {
         blogs: []
     });
     const [classes, setClasses] = useState(LOCAL_CLASSES);
-    const [subjects, setSubjects] = useState(DEFAULT_SUBJECTS);
+    const [subjects, setSubjects] = useState(DEFAULT_SUBJECTS); // { className: [subject,...] }
     const [terms, setTerms] = useState(DEFAULT_TERMS);
     const [sections, setSections] = useState([]);
     const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
@@ -97,7 +98,16 @@ export const SchoolDataProvider = ({ children }) => {
             }));
 
             if (metaMap['CLASSES']) setClasses(metaMap['CLASSES']);
-            if (metaMap['SUBJECTS']) setSubjects(metaMap['SUBJECTS']);
+            if (metaMap['SUBJECTS']) {
+                // Support both old flat-array format and new per-class object format
+                const loaded = metaMap['SUBJECTS'];
+                if (Array.isArray(loaded)) {
+                    // Legacy: was a global list — keep it but don't migrate automatically
+                    setSubjects({});
+                } else {
+                    setSubjects(loaded);
+                }
+            }
             if (metaMap['TERMS']) setTerms(metaMap['TERMS']);
             if (metaMap['SECTIONS']) setSections(metaMap['SECTIONS']); // Load SECTIONS
             if (metaMap['WEIGHTS']) setWeights(metaMap['WEIGHTS']);
@@ -166,9 +176,10 @@ export const SchoolDataProvider = ({ children }) => {
         if (!error) setClasses(newClassesList);
     };
 
-    const updateSubjects = async (newSubjectsList) => {
-        const { error } = await supabase.from('metadata').upsert({ key: 'SUBJECTS', value: newSubjectsList });
-        if (!error) setSubjects(newSubjectsList);
+    const updateSubjects = async (newSubjectsMap) => {
+        // newSubjectsMap is { className: [subject,...] }
+        const { error } = await supabase.from('metadata').upsert({ key: 'SUBJECTS', value: newSubjectsMap });
+        if (!error) setSubjects(newSubjectsMap);
     };
 
     const updateTerms = async (newTermsList) => {
