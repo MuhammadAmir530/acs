@@ -357,6 +357,8 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     const [editingSectionId, setEditingSectionId] = useState(null);
     const [editingSectionName, setEditingSectionName] = useState('');
     const classImportFileRef = useRef(null);
+    const [editingStudentId, setEditingStudentId] = useState(null);
+    const [editStudentData, setEditStudentData] = useState(null);
 
     const students = schoolData.students || [];
 
@@ -3701,6 +3703,85 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
 
                                     {/* Student List */}
                                     <div style={{ padding: '1.5rem' }}>
+
+                                        {/* ── Inline Edit Panel ── */}
+                                        {editingStudentId && editStudentData && (
+                                            <div style={{
+                                                background: 'linear-gradient(135deg, #eff6ff, #f0fdf4)',
+                                                border: '2px solid var(--color-primary)',
+                                                borderRadius: '12px',
+                                                padding: '1.5rem',
+                                                marginBottom: '1.5rem',
+                                                boxShadow: '0 4px 16px rgba(37,99,235,0.12)'
+                                            }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                                                    <h4 style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-primary)', margin: 0 }}>
+                                                        ✏️ Editing: {editStudentData.name} ({editingStudentId})
+                                                    </h4>
+                                                    <button onClick={() => { setEditingStudentId(null); setEditStudentData(null); }}
+                                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: '1.2rem', lineHeight: 1 }}>
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                                                    <div>
+                                                        <label className="form-label">Student Name</label>
+                                                        <input className="form-input" value={editStudentData.name || ''}
+                                                            onChange={e => setEditStudentData(prev => ({ ...prev, name: e.target.value }))} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="form-label">Father Name</label>
+                                                        <input className="form-input" value={editStudentData.admissions?.[0]?.fatherName || ''}
+                                                            onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), fatherName: e.target.value }] }))} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="form-label">Gender</label>
+                                                        <select className="form-input" value={editStudentData.admissions?.[0]?.gender || ''}
+                                                            onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), gender: e.target.value }] }))}>
+                                                            <option value="">— Select —</option>
+                                                            <option value="Male">Male</option>
+                                                            <option value="Female">Female</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="form-label">Contact</label>
+                                                        <input className="form-input" value={editStudentData.admissions?.[0]?.contact || ''}
+                                                            onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), contact: e.target.value }] }))} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="form-label">WhatsApp</label>
+                                                        <input className="form-input" value={editStudentData.admissions?.[0]?.whatsapp || ''}
+                                                            onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), whatsapp: e.target.value }] }))} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="form-label">Class</label>
+                                                        <select className="form-input" value={editStudentData.grade || ''}
+                                                            onChange={e => setEditStudentData(prev => ({ ...prev, grade: e.target.value }))}>
+                                                            {sectionClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div style={{ gridColumn: '1 / -1' }}>
+                                                        <label className="form-label">Address</label>
+                                                        <input className="form-input" value={editStudentData.admissions?.[0]?.address || ''}
+                                                            onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), address: e.target.value }] }))} />
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+                                                    <button onClick={() => { setEditingStudentId(null); setEditStudentData(null); }}
+                                                        className="btn" style={{ background: '#f1f5f9', color: '#64748b' }}>Cancel</button>
+                                                    <button className="btn btn-primary" onClick={async () => {
+                                                        const updated = students.map(s => s.id === editingStudentId ? editStudentData : s);
+                                                        await setStudents(updated);
+                                                        showSaveMessage(`${editStudentData.name} updated successfully!`);
+                                                        setEditingStudentId(null);
+                                                        setEditStudentData(null);
+                                                    }}>
+                                                        <Save size={16} /> Save Changes
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                             <thead>
                                                 <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#64748b', fontSize: '0.8rem', textTransform: 'uppercase' }}>
@@ -3717,7 +3798,11 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                                     .filter(s => s.grade === viewingClass && (classDetailTab === 'all' || s.admissions?.[0]?.gender === (classDetailTab === 'boys' ? 'Male' : 'Female')))
                                                     .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
                                                     .map(student => (
-                                                        <tr key={student.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                        <tr key={student.id} style={{
+                                                            borderBottom: '1px solid #f1f5f9',
+                                                            background: editingStudentId === student.id ? '#eff6ff' : 'transparent',
+                                                            transition: 'background 0.2s'
+                                                        }}>
                                                             <td style={{ padding: '0.75rem', fontWeight: 600 }}>{student.id}</td>
                                                             <td style={{ padding: '0.75rem' }}>
                                                                 <div style={{ fontWeight: 600 }}>{student.name}</div>
@@ -3734,19 +3819,31 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                                             </td>
                                                             <td style={{ padding: '0.75rem', color: '#64748b' }}>{student.admissions?.[0]?.contact || '—'}</td>
                                                             <td style={{ padding: '0.75rem' }}>
-                                                                <button onClick={() => {
-                                                                    openConfirm(
-                                                                        '🗑 Delete Student',
-                                                                        `Are you sure you want to permanently delete "${student.name}" (${student.id})? All their records including marks, attendance and fee history will be lost. This cannot be undone.`,
-                                                                        async () => {
-                                                                            const newStudents = students.filter(s => s.id !== student.id);
-                                                                            await setStudents(newStudents);
-                                                                            showSaveMessage(`${student.name} deleted.`);
-                                                                        }
-                                                                    );
-                                                                }} className="btn icon-btn" style={{ color: '#ef4444' }} title="Delete Student">
-                                                                    <Trash2 size={16} />
-                                                                </button>
+                                                                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setEditingStudentId(student.id);
+                                                                            setEditStudentData(JSON.parse(JSON.stringify(student)));
+                                                                        }}
+                                                                        className="btn icon-btn"
+                                                                        style={{ color: '#2563eb', background: editingStudentId === student.id ? '#dbeafe' : 'transparent' }}
+                                                                        title="Edit Student">
+                                                                        <Edit3 size={16} />
+                                                                    </button>
+                                                                    <button onClick={() => {
+                                                                        openConfirm(
+                                                                            '🗑 Delete Student',
+                                                                            `Are you sure you want to permanently delete "${student.name}" (${student.id})? All their records including marks, attendance and fee history will be lost. This cannot be undone.`,
+                                                                            async () => {
+                                                                                const newStudents = students.filter(s => s.id !== student.id);
+                                                                                await setStudents(newStudents);
+                                                                                showSaveMessage(`${student.name} deleted.`);
+                                                                            }
+                                                                        );
+                                                                    }} className="btn icon-btn" style={{ color: '#ef4444' }} title="Delete Student">
+                                                                        <Trash2 size={16} />
+                                                                    </button>
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     ))}
