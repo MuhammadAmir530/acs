@@ -15,7 +15,8 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     const { schoolData, CLASSES, SUBJECTS, TERMS, SECTIONS, WEIGHTS, fetchData, setStudents, setFaculty, updateSchoolInfo, setAnnouncements, updateClasses, updateSubjects, updateTerms, updateSections, updateWeights, adminCredentials, changeAdminPassword } = useSchoolData();
     const [activeTab, setActiveTab] = useState('admissions');
     const [saveMessage, setSaveMessage] = useState('');
-    const [selectedClass, setSelectedClass] = useState(CLASSES[0]);
+    const sectionClasses = (SECTIONS || []).flatMap(s => s.classes || []);
+    const [selectedClass, setSelectedClass] = useState(sectionClasses[0] || '');
     const [reportSearch, setReportSearch] = useState('');
 
     // ── Gradebook State ──
@@ -332,7 +333,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
 
     // Admission Form State
     const admissionInitialState = {
-        applyingFor: CLASSES[0], applicationDate: new Date().toISOString().split('T')[0],
+        applyingFor: sectionClasses[0] || '', applicationDate: new Date().toISOString().split('T')[0],
         serialNumber: '', // Added Serial Number field
         studentName: '', bForm: '', dob: '', nationality: '', gender: '', religion: '',
         allergies: 'No', allergiesDetails: '', chronicCondition: 'No', chronicConditionDetails: '',
@@ -350,7 +351,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     const [tempBlog, setTempBlog] = useState(null);
 
     // Class Management State
-    const [selectedClassForList, setSelectedClassForList] = useState(CLASSES[0]);
+    const [selectedClassForList, setSelectedClassForList] = useState(sectionClasses[0] || '');
     const [classListSearch, setClassListSearch] = useState('');
     const [newClassName, setNewClassName] = useState('');
     const [editingSectionId, setEditingSectionId] = useState(null);
@@ -2289,7 +2290,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                         {/* Class */}
                                         <select className="form-input" style={{ padding: '0.4rem 0.75rem' }} value={selectedClass}
                                             onChange={e => { setSelectedClass(e.target.value); setGbEdits({}); }}>
-                                            {CLASSES.map(c => <option key={c}>{c}</option>)}
+                                            {sectionClasses.map(c => <option key={c}>{c}</option>)}
                                         </select>
                                         {/* Term label */}
                                         <select className="form-input" style={{ padding: '0.4rem 0.75rem', fontWeight: 700 }} value={gbTerm}
@@ -2649,7 +2650,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                     </div>
                                     <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                         <select className="form-input" style={{ padding: '0.5rem 0.8rem', minWidth: '150px' }} value={selectedClass} onChange={e => setSelectedClass(e.target.value)}>
-                                            {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                                            {sectionClasses.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
                                         <input type="date" value={attDateFilter} onChange={e => setAttDateFilter(e.target.value)}
                                             className="form-input" style={{ padding: '0.5rem 0.8rem' }} />
@@ -2807,7 +2808,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                             value={selectedClass}
                                             onChange={e => setSelectedClass(e.target.value)}
                                         >
-                                            {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                                            {sectionClasses.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
                                         <button
                                             onClick={openNewFeeMonth}
@@ -2985,7 +2986,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                             value={admissionData.applyingFor}
                                             onChange={(e) => setAdmissionData({ ...admissionData, applyingFor: e.target.value })}
                                         >
-                                            {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                                            {sectionClasses.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
                                     </div>
                                     <div>
@@ -3628,7 +3629,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                         value={selectedClassForList}
                                         onChange={(e) => setSelectedClassForList(e.target.value)}
                                     >
-                                        {(SECTIONS || []).flatMap(s => s.classes || []).map(c => <option key={c} value={c}>{c}</option>)}
+                                        {sectionClasses.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
                                 </div>
                             </div>
