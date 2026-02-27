@@ -3628,7 +3628,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                         value={selectedClassForList}
                                         onChange={(e) => setSelectedClassForList(e.target.value)}
                                     >
-                                        {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                                        {(SECTIONS || []).flatMap(s => s.classes || []).map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
                                 </div>
                             </div>
