@@ -319,8 +319,147 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         XLSX.writeFile(wb, `Marks_Template_${selectedClass}_${termLabel}_${genderLabel}.xlsx`);
     };
 
+    // ── PDF Result Report ──
+    const exportResultPDF = () => {
+        const termLabel = gbTerm || TERMS[0] || 'Current';
+        const allClassStudents = students.filter(s => s.grade === selectedClass);
+        const classStudents = allClassStudents
+            .slice()
+            .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+        const subs = classSubjects;
+        const schoolName = schoolData.name || 'ACS School & College';
+        const printDate = new Date().toLocaleDateString('en-PK', { day: '2-digit', month: 'long', year: 'numeric' });
+        const sectionName = (SECTIONS || []).find(s => s.classes.includes(selectedClass))?.name || '';
 
-    // File refs
+        const gradeColors = (pct) => {
+            if (pct >= 90) return { bg: '#d1fae5', text: '#065f46', border: '#34d399' };
+            if (pct >= 80) return { bg: '#dcfce7', text: '#15803d', border: '#86efac' };
+            if (pct >= 70) return { bg: '#dbeafe', text: '#1d4ed8', border: '#93c5fd' };
+            if (pct >= 60) return { bg: '#ede9fe', text: '#6d28d9', border: '#c4b5fd' };
+            if (pct >= 50) return { bg: '#fef9c3', text: '#a16207', border: '#fde047' };
+            if (pct >= 40) return { bg: '#ffedd5', text: '#c2410c', border: '#fdba74' };
+            return { bg: '#fee2e2', text: '#dc2626', border: '#fca5a5' };
+        };
+
+        // Build rows
+        const rows = classStudents.map((s, idx) => {
+            const res = getTermResults(s, termLabel);
+            const overall = res.length ? calcOverallPct(res) : null;
+            const gc = overall !== null ? gradeColors(overall) : { bg: '#f1f5f9', text: '#64748b', border: '#cbd5e1' };
+            const subCells = subs.map(sub => {
+                const r = res.find(r => r.subject === sub);
+                const ob = r ? r.obtained : null;
+                const total = getSubjectTotal(sub);
+                const pct = ob !== null ? Math.round((ob / total) * 100) : null;
+                const sc = pct !== null ? gradeColors(pct) : { bg: '#f8fafc', text: '#94a3b8', border: '#e2e8f0' };
+                return `<td style="text-align:center; padding:6px 4px; border:1px solid #e2e8f0; background:${sc.bg}; color:${sc.text}; font-weight:600; font-size:12px;">${ob !== null ? `${ob}<br/><span style='font-size:10px;font-weight:400'>${calcGrade(pct)}</span>` : '—'}</td>`;
+            }).join('');
+            return `
+                <tr style="background:${idx % 2 === 0 ? '#fff' : '#f8fafc'}">
+                    <td style="padding:8px 10px; border:1px solid #e2e8f0; font-weight:600; font-size:12px; color:#475569;">${idx + 1}</td>
+                    <td style="padding:8px 10px; border:1px solid #e2e8f0; font-weight:700; font-size:12px; color:#1e293b;">${s.name}</td>
+                    <td style="padding:8px 4px; border:1px solid #e2e8f0; font-size:11px; color:#64748b; text-align:center">${s.id}</td>
+                    ${subCells}
+                    <td style="text-align:center; padding:6px 8px; border:1px solid ${gc.border}; background:${gc.bg}; color:${gc.text}; font-weight:800; font-size:13px;">
+                        ${overall !== null ? `${overall}%<br/><span style='font-size:11px'>${calcGrade(overall)}</span>` : '—'}
+                    </td>
+                    <td style="text-align:center; padding:6px 8px; border:1px solid #e2e8f0; font-weight:700; font-size:12px; color:${overall !== null && overall >= 40 ? '#15803d' : '#dc2626'}">
+                        ${overall !== null ? (overall >= 40 ? 'PASS' : 'FAIL') : '—'}
+                    </td>
+                </tr>`;
+        }).join('');
+
+        // Stats
+        const withResults = classStudents.filter(s => getTermResults(s, termLabel).length > 0);
+        const passCount = withResults.filter(s => calcOverallPct(getTermResults(s, termLabel)) >= 40).length;
+        const avgPct = withResults.length ? Math.round(withResults.reduce((sum, s) => sum + calcOverallPct(getTermResults(s, termLabel)), 0) / withResults.length) : 0;
+        const topStudent = withResults.sort((a, b) => calcOverallPct(getTermResults(b, termLabel)) - calcOverallPct(getTermResults(a, termLabel)))[0];
+
+        const subHeaders = subs.map(sub =>
+            `<th style="padding:8px 4px; background:#1e3a5f; color:white; font-size:11px; text-align:center; min-width:80px; border:1px solid #2d4f7c">${sub}<br/><span style='font-weight:400;font-size:10px'>/${getSubjectTotal(sub)}</span></th>`
+        ).join('');
+
+        const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Result Report - ${selectedClass} - ${termLabel}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; color: #1e293b; }
+  @page { size: A4 landscape; margin: 12mm; }
+  @media print {
+    .no-print { display: none !important; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+  .header { background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); color: white; padding: 20px 28px; border-radius: 8px 8px 0 0; }
+  .header h1 { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+  .header p { font-size: 12px; opacity: 0.85; }
+  .meta-bar { display: flex; gap: 24px; background: #f1f5f9; padding: 12px 28px; border-bottom: 2px solid #e2e8f0; flex-wrap: wrap; }
+  .meta-item { display: flex; flex-direction: column; }
+  .meta-label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.05em; }
+  .meta-value { font-size: 14px; font-weight: 700; color: #1e293b; }
+  .stats-bar { display: flex; gap: 16px; padding: 14px 28px; background: #fff; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; }
+  .stat-card { flex: 1; min-width: 100px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; text-align: center; }
+  .stat-num { font-size: 22px; font-weight: 800; color: #1e3a5f; }
+  .stat-lbl { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; margin-top: 2px; }
+  .table-wrap { overflow-x: auto; padding: 0 28px 28px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12px; }
+  thead tr th { position: sticky; top: 0; }
+  .footer { text-align: center; padding: 16px 28px; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; }
+  .print-btn { position: fixed; bottom: 24px; right: 24px; background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.4); }
+  .print-btn:hover { background: #1d4ed8; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📊 ${schoolName}</h1>
+  <p>Result Report &nbsp;|&nbsp; ${sectionName ? sectionName + ' — ' : ''}${selectedClass} &nbsp;|&nbsp; ${termLabel} &nbsp;|&nbsp; Generated: ${printDate}</p>
+</div>
+<div class="meta-bar">
+  <div class="meta-item"><span class="meta-label">Class</span><span class="meta-value">${selectedClass}</span></div>
+  ${sectionName ? `<div class="meta-item"><span class="meta-label">Section</span><span class="meta-value">${sectionName}</span></div>` : ''}
+  <div class="meta-item"><span class="meta-label">Term</span><span class="meta-value">${termLabel}</span></div>
+  <div class="meta-item"><span class="meta-label">Total Students</span><span class="meta-value">${classStudents.length}</span></div>
+  <div class="meta-item"><span class="meta-label">Appeared</span><span class="meta-value">${withResults.length}</span></div>
+  <div class="meta-item"><span class="meta-label">Date</span><span class="meta-value">${printDate}</span></div>
+</div>
+<div class="stats-bar">
+  <div class="stat-card"><div class="stat-num" style="color:#15803d">${passCount}</div><div class="stat-lbl">Passed</div></div>
+  <div class="stat-card"><div class="stat-num" style="color:#dc2626">${withResults.length - passCount}</div><div class="stat-lbl">Failed</div></div>
+  <div class="stat-card"><div class="stat-num" style="color:#1d4ed8">${withResults.length ? Math.round((passCount / withResults.length) * 100) : 0}%</div><div class="stat-lbl">Pass Rate</div></div>
+  <div class="stat-card"><div class="stat-num">${avgPct}%</div><div class="stat-lbl">Class Average</div></div>
+  ${topStudent ? `<div class="stat-card" style="flex:2;"><div class="stat-num" style="font-size:16px;color:#7c3aed">${topStudent.name}</div><div class="stat-lbl">🏆 Top Student — ${calcOverallPct(getTermResults(topStudent, termLabel))}%</div></div>` : ''}
+</div>
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th style="padding:8px 10px; background:#1e3a5f; color:white; text-align:left; font-size:11px; border:1px solid #2d4f7c">#</th>
+      <th style="padding:8px 10px; background:#1e3a5f; color:white; text-align:left; font-size:11px; min-width:160px; border:1px solid #2d4f7c">Student Name</th>
+      <th style="padding:8px 4px; background:#1e3a5f; color:white; text-align:center; font-size:11px; min-width:90px; border:1px solid #2d4f7c">ID</th>
+      ${subHeaders}
+      <th style="padding:8px 8px; background:#0f2744; color:#fbbf24; text-align:center; font-size:11px; min-width:70px; border:1px solid #2d4f7c">Overall</th>
+      <th style="padding:8px 8px; background:#0f2744; color:#fbbf24; text-align:center; font-size:11px; min-width:55px; border:1px solid #2d4f7c">Result</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+</div>
+<div class="footer">
+  ${schoolName} &nbsp;|&nbsp; ${selectedClass} &nbsp;|&nbsp; ${termLabel} &nbsp;|&nbsp; Printed: ${printDate} &nbsp;|&nbsp; Total Students: ${classStudents.length}
+</div>
+<button class="print-btn no-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+</body>
+</html>`;
+
+        const win = window.open('', '_blank');
+        win.document.write(html);
+        win.document.close();
+        setTimeout(() => win.print(), 600);
+    };
+
+
     const attendanceFileRef = useRef(null);
     const marksFileRef = useRef(null);
     const feeFileRef = useRef(null);
@@ -360,6 +499,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     const [editingSectionId, setEditingSectionId] = useState(null);
     const [editingSectionName, setEditingSectionName] = useState('');
     const classImportFileRef = useRef(null);
+    const studentPhotoUploadRef = useRef(null);
     const [editingStudentId, setEditingStudentId] = useState(null);
     const [editStudentData, setEditStudentData] = useState(null);
 
@@ -442,6 +582,18 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
             alert('Error uploading image: ' + error.message);
             return null;
         }
+    };
+
+    const handleStudentPhotoUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        showSaveMessage('Uploading photo…');
+        const publicUrl = await uploadImage(file, 'students');
+        if (publicUrl) {
+            setEditStudentData(prev => ({ ...prev, photo: publicUrl, image: publicUrl }));
+            showSaveMessage('Photo uploaded! Click Save Changes to apply.');
+        }
+        e.target.value = '';
     };
 
     const handleAdmissionPhotoUpload = async (e) => {
@@ -2321,6 +2473,9 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                         <button onClick={() => setShowGbSettings(s => !s)} className="btn" style={{ padding: '0.45rem 0.9rem' }}>
                                             ⚙️ Settings
                                         </button>
+                                        <button onClick={exportResultPDF} className="btn" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626', padding: '0.45rem 0.9rem' }}>
+                                            📄 PDF Report
+                                        </button>
                                     </div>
                                 </div>
 
@@ -3708,80 +3863,213 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                     {/* Student List */}
                                     <div style={{ padding: '1.5rem' }}>
 
-                                        {/* ── Inline Edit Panel ── */}
+                                        {/* ── Full-Screen Student Edit Modal ── */}
                                         {editingStudentId && editStudentData && (
                                             <div style={{
-                                                background: 'linear-gradient(135deg, #eff6ff, #f0fdf4)',
-                                                border: '2px solid var(--color-primary)',
-                                                borderRadius: '12px',
-                                                padding: '1.5rem',
-                                                marginBottom: '1.5rem',
-                                                boxShadow: '0 4px 16px rgba(37,99,235,0.12)'
+                                                position: 'fixed', inset: 0, zIndex: 9999,
+                                                background: 'rgba(15,23,42,0.55)',
+                                                backdropFilter: 'blur(4px)',
+                                                display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+                                                overflowY: 'auto', padding: '2rem 1rem'
                                             }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                                                    <h4 style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-primary)', margin: 0 }}>
-                                                        ✏️ Editing: {editStudentData.name} ({editingStudentId})
-                                                    </h4>
-                                                    <button onClick={() => { setEditingStudentId(null); setEditStudentData(null); }}
-                                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: '1.2rem', lineHeight: 1 }}>
-                                                        ✕
-                                                    </button>
-                                                </div>
-                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-                                                    <div>
-                                                        <label className="form-label">Student Name</label>
-                                                        <input className="form-input" value={editStudentData.name || ''}
-                                                            onChange={e => setEditStudentData(prev => ({ ...prev, name: e.target.value }))} />
+                                                <div style={{
+                                                    background: 'white', borderRadius: '16px',
+                                                    width: '100%', maxWidth: '860px',
+                                                    boxShadow: '0 25px 60px rgba(0,0,0,0.25)',
+                                                    overflow: 'hidden'
+                                                }}>
+                                                    {/* Modal Header */}
+                                                    <div style={{ background: 'linear-gradient(135deg, #1e3a5f, #2563eb)', color: 'white', padding: '1.5rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <div>
+                                                            <h2 style={{ margin: 0, fontWeight: 800, fontSize: '1.3rem' }}>✏️ Edit Student</h2>
+                                                            <p style={{ margin: '0.25rem 0 0', opacity: 0.8, fontSize: '0.85rem' }}>{editStudentData.id} — {editStudentData.grade}</p>
+                                                        </div>
+                                                        <button onClick={() => { setEditingStudentId(null); setEditStudentData(null); }}
+                                                            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', borderRadius: '8px', padding: '0.4rem 0.75rem', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 700 }}>✕</button>
                                                     </div>
-                                                    <div>
-                                                        <label className="form-label">Father Name</label>
-                                                        <input className="form-input" value={editStudentData.admissions?.[0]?.fatherName || ''}
-                                                            onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), fatherName: e.target.value }] }))} />
+
+                                                    <div style={{ padding: '2rem' }}>
+
+                                                        {/* ── Photo + Class row ── */}
+                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem', marginBottom: '2rem', paddingBottom: '1.5rem', borderBottom: '1px solid #f1f5f9' }}>
+                                                            {/* Photo */}
+                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                                                                <div style={{ width: '120px', height: '140px', background: '#f8fafc', border: '2px dashed #cbd5e1', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                    {editStudentData.photo || editStudentData.image
+                                                                        ? <img src={editStudentData.photo || editStudentData.image} alt={editStudentData.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                                        : <Camera size={32} color="#94a3b8" />}
+                                                                </div>
+                                                                <button onClick={() => studentPhotoUploadRef.current.click()} className="btn btn-sm" style={{ background: 'var(--color-primary)', color: 'white', fontSize: '0.8rem' }}>
+                                                                    <Camera size={13} /> Upload Photo
+                                                                </button>
+                                                                {(editStudentData.photo || editStudentData.image) && (
+                                                                    <button onClick={() => setEditStudentData(prev => ({ ...prev, photo: '', image: '' }))} style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '0.78rem', cursor: 'pointer' }}>Remove photo</button>
+                                                                )}
+                                                                <input type="file" ref={studentPhotoUploadRef} accept="image/*" style={{ display: 'none' }} onChange={handleStudentPhotoUpload} />
+                                                            </div>
+                                                            {/* Class + date */}
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                                                <div>
+                                                                    <label className="form-label">Applying For (Class)</label>
+                                                                    <select className="form-input" value={editStudentData.grade || ''}
+                                                                        onChange={e => setEditStudentData(prev => ({ ...prev, grade: e.target.value }))}>
+                                                                        {sectionClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                                                                    </select>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="form-label">Serial Number (Optional)</label>
+                                                                    <input className="form-input" placeholder="Unique serial number"
+                                                                        value={editStudentData.serial_number || ''}
+                                                                        onChange={e => setEditStudentData(prev => ({ ...prev, serial_number: e.target.value }))} />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* ── Student Information ── */}
+                                                        <div style={{ marginBottom: '2rem' }}>
+                                                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                                <User size={16} /> Student's Information
+                                                            </h3>
+                                                            <div className="grid grid-cols-2" style={{ gap: '1.25rem' }}>
+                                                                <div>
+                                                                    <label className="form-label">Student's Name (Capital Letters)</label>
+                                                                    <input className="form-input" value={editStudentData.name || ''}
+                                                                        onChange={e => setEditStudentData(prev => ({ ...prev, name: e.target.value.toUpperCase() }))} />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="form-label">B-Form Number</label>
+                                                                    <input className="form-input" placeholder="35202-0000000-0"
+                                                                        value={editStudentData.admissions?.[0]?.bForm || ''}
+                                                                        onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), bForm: e.target.value }] }))} />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="form-label">Date of Birth</label>
+                                                                    <input type="date" className="form-input"
+                                                                        value={editStudentData.admissions?.[0]?.dob || ''}
+                                                                        onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), dob: e.target.value }] }))} />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="form-label">Nationality</label>
+                                                                    <input className="form-input" placeholder="e.g. Pakistani"
+                                                                        value={editStudentData.admissions?.[0]?.nationality || ''}
+                                                                        onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), nationality: e.target.value }] }))} />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="form-label">Gender</label>
+                                                                    <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.35rem' }}>
+                                                                        {['Male', 'Female', 'Others'].map(g => (
+                                                                            <label key={g} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                                                                                <input type="radio" name="edit_gender" checked={editStudentData.admissions?.[0]?.gender === g}
+                                                                                    onChange={() => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), gender: g }] }))} /> {g}
+                                                                            </label>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="form-label">Religion</label>
+                                                                    <input className="form-input" placeholder="e.g. Islam"
+                                                                        value={editStudentData.admissions?.[0]?.religion || ''}
+                                                                        onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), religion: e.target.value }] }))} />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* ── Health & Medical ── */}
+                                                        <div style={{ marginBottom: '2rem', background: '#f8fafc', borderRadius: '10px', padding: '1.25rem' }}>
+                                                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                                <Award size={16} /> Health & Medical
+                                                            </h3>
+                                                            <div className="grid grid-cols-2" style={{ gap: '1.25rem' }}>
+                                                                <div>
+                                                                    <label className="form-label">Any Allergies?</label>
+                                                                    <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.35rem' }}>
+                                                                        {['Yes', 'No'].map(o => (
+                                                                            <label key={o} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                                                                                <input type="radio" name="edit_allergy" checked={(editStudentData.admissions?.[0]?.allergies || 'No') === o}
+                                                                                    onChange={() => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), allergies: o }] }))} /> {o}
+                                                                            </label>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="form-label">Allergy Details</label>
+                                                                    <input className="form-input" value={editStudentData.admissions?.[0]?.allergiesDetails || ''}
+                                                                        onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), allergiesDetails: e.target.value }] }))} />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="form-label">Chronic Medical Condition?</label>
+                                                                    <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.35rem' }}>
+                                                                        {['Yes', 'No'].map(o => (
+                                                                            <label key={o} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                                                                                <input type="radio" name="edit_chronic" checked={(editStudentData.admissions?.[0]?.chronicCondition || 'No') === o}
+                                                                                    onChange={() => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), chronicCondition: o }] }))} /> {o}
+                                                                            </label>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="form-label">Condition Details</label>
+                                                                    <input className="form-input" value={editStudentData.admissions?.[0]?.chronicConditionDetails || ''}
+                                                                        onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), chronicConditionDetails: e.target.value }] }))} />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* ── Parent Information ── */}
+                                                        <div style={{ marginBottom: '2rem' }}>
+                                                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                                <Users size={16} /> Parent's Information
+                                                            </h3>
+                                                            <div className="grid grid-cols-2" style={{ gap: '1.25rem' }}>
+                                                                <div className="col-span-2">
+                                                                    <label className="form-label">Father's Name (Capital Letters)</label>
+                                                                    <input className="form-input"
+                                                                        value={editStudentData.admissions?.[0]?.fatherName || ''}
+                                                                        onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), fatherName: e.target.value.toUpperCase() }] }))} />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="form-label">Father's CNIC</label>
+                                                                    <input className="form-input" placeholder="35202-0000000-0"
+                                                                        value={editStudentData.admissions?.[0]?.fatherCnic || ''}
+                                                                        onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), fatherCnic: e.target.value }] }))} />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="form-label">Contact Number</label>
+                                                                    <input className="form-input"
+                                                                        value={editStudentData.admissions?.[0]?.contact || ''}
+                                                                        onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), contact: e.target.value }] }))} />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="form-label">WhatsApp Number</label>
+                                                                    <input className="form-input"
+                                                                        value={editStudentData.admissions?.[0]?.whatsapp || ''}
+                                                                        onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), whatsapp: e.target.value }] }))} />
+                                                                </div>
+                                                                <div className="col-span-2">
+                                                                    <label className="form-label">Home Address</label>
+                                                                    <textarea className="form-input" style={{ height: '80px' }}
+                                                                        value={editStudentData.admissions?.[0]?.address || ''}
+                                                                        onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), address: e.target.value }] }))} />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* ── Action Buttons ── */}
+                                                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid #f1f5f9' }}>
+                                                            <button onClick={() => { setEditingStudentId(null); setEditStudentData(null); }}
+                                                                className="btn" style={{ background: '#f1f5f9', color: '#64748b', padding: '0.6rem 1.5rem' }}>Cancel</button>
+                                                            <button className="btn btn-primary" style={{ padding: '0.6rem 2rem', fontWeight: 700 }}
+                                                                onClick={async () => {
+                                                                    const updated = students.map(s => s.id === editingStudentId ? editStudentData : s);
+                                                                    await setStudents(updated);
+                                                                    showSaveMessage(`✅ ${editStudentData.name} updated successfully!`);
+                                                                    setEditingStudentId(null);
+                                                                    setEditStudentData(null);
+                                                                }}>
+                                                                <Save size={16} /> Update Student
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <label className="form-label">Gender</label>
-                                                        <select className="form-input" value={editStudentData.admissions?.[0]?.gender || ''}
-                                                            onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), gender: e.target.value }] }))}>
-                                                            <option value="">— Select —</option>
-                                                            <option value="Male">Male</option>
-                                                            <option value="Female">Female</option>
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className="form-label">Contact</label>
-                                                        <input className="form-input" value={editStudentData.admissions?.[0]?.contact || ''}
-                                                            onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), contact: e.target.value }] }))} />
-                                                    </div>
-                                                    <div>
-                                                        <label className="form-label">WhatsApp</label>
-                                                        <input className="form-input" value={editStudentData.admissions?.[0]?.whatsapp || ''}
-                                                            onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), whatsapp: e.target.value }] }))} />
-                                                    </div>
-                                                    <div>
-                                                        <label className="form-label">Class</label>
-                                                        <select className="form-input" value={editStudentData.grade || ''}
-                                                            onChange={e => setEditStudentData(prev => ({ ...prev, grade: e.target.value }))}>
-                                                            {sectionClasses.map(c => <option key={c} value={c}>{c}</option>)}
-                                                        </select>
-                                                    </div>
-                                                    <div style={{ gridColumn: '1 / -1' }}>
-                                                        <label className="form-label">Address</label>
-                                                        <input className="form-input" value={editStudentData.admissions?.[0]?.address || ''}
-                                                            onChange={e => setEditStudentData(prev => ({ ...prev, admissions: [{ ...(prev.admissions?.[0] || {}), address: e.target.value }] }))} />
-                                                    </div>
-                                                </div>
-                                                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem', justifyContent: 'flex-end' }}>
-                                                    <button onClick={() => { setEditingStudentId(null); setEditStudentData(null); }}
-                                                        className="btn" style={{ background: '#f1f5f9', color: '#64748b' }}>Cancel</button>
-                                                    <button className="btn btn-primary" onClick={async () => {
-                                                        const updated = students.map(s => s.id === editingStudentId ? editStudentData : s);
-                                                        await setStudents(updated);
-                                                        showSaveMessage(`${editStudentData.name} updated successfully!`);
-                                                        setEditingStudentId(null);
-                                                        setEditStudentData(null);
-                                                    }}>
-                                                        <Save size={16} /> Save Changes
-                                                    </button>
                                                 </div>
                                             </div>
                                         )}
@@ -3789,6 +4077,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                             <thead>
                                                 <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#64748b', fontSize: '0.8rem', textTransform: 'uppercase' }}>
+                                                    <th style={{ padding: '0.75rem', width: '48px' }}></th>
                                                     <th style={{ padding: '0.75rem' }}>ID</th>
                                                     <th style={{ padding: '0.75rem' }}>Name</th>
                                                     <th style={{ padding: '0.75rem' }}>Father Name</th>
@@ -3807,6 +4096,15 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                                             background: editingStudentId === student.id ? '#eff6ff' : 'transparent',
                                                             transition: 'background 0.2s'
                                                         }}>
+                                                            <td style={{ padding: '0.5rem 0.75rem' }}>
+                                                                <div style={{ width: '38px', height: '38px', borderRadius: '50%', overflow: 'hidden', background: '#e0f2fe', border: '2px solid #bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                                    {student.photo || student.image ? (
+                                                                        <img src={student.photo || student.image} alt={student.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                                    ) : (
+                                                                        <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0369a1' }}>{student.name?.charAt(0)?.toUpperCase()}</span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
                                                             <td style={{ padding: '0.75rem', fontWeight: 600 }}>{student.id}</td>
                                                             <td style={{ padding: '0.75rem' }}>
                                                                 <div style={{ fontWeight: 600 }}>{student.name}</div>
@@ -3830,7 +4128,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                                                             setEditStudentData(JSON.parse(JSON.stringify(student)));
                                                                         }}
                                                                         className="btn icon-btn"
-                                                                        style={{ color: '#2563eb', background: editingStudentId === student.id ? '#dbeafe' : 'transparent' }}
+                                                                        style={{ color: '#2563eb', background: 'transparent' }}
                                                                         title="Edit Student">
                                                                         <Edit3 size={16} />
                                                                     </button>
@@ -4160,8 +4458,8 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                     accept=".xlsx, .xls"
                     onChange={importStudentsExcel}
                 />
-            </section>
-        </div>
+            </section >
+        </div >
     );
 };
 
