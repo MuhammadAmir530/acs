@@ -74,7 +74,14 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     const [showGbSettings, setShowGbSettings] = useState(false);
 
     // Helper: get total marks for a subject (from WEIGHTS map, fallback 100)
-    const getSubjectTotal = (sub) => Number(WEIGHTS[sub]) || 100;
+    const getSubjectTotal = (sub, term) => {
+        const t = term || gbTerm || TERMS[0] || 'Current';
+        if (WEIGHTS) {
+            if (WEIGHTS[t] && typeof WEIGHTS[t] === 'object' && WEIGHTS[t][sub]) return Number(WEIGHTS[t][sub]);
+            if (typeof WEIGHTS[sub] === 'number') return Number(WEIGHTS[sub]);
+        }
+        return 100;
+    };
 
     // ── Overall Percentage Calculation ──
     // Uses per-subject totals from WEIGHTS: sum(obtained) / sum(totals) × 100
@@ -83,7 +90,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         if (!results || results.length === 0) return 0;
         let totalObtained = 0, totalMax = 0;
         results.forEach(r => {
-            const subTotal = getSubjectTotal(r.subject);
+            const subTotal = getSubjectTotal(r.subject, r.term);
             const obtained = r.obtained !== undefined ? r.obtained : Math.round((r.percentage / 100) * subTotal);
             totalObtained += obtained;
             totalMax += subTotal;
@@ -151,7 +158,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
             if (!gbEdits[s.id]) return s;
             // Build new results for this term only
             const newTermResults = classSubjects.map(subject => {
-                const subTotal = getSubjectTotal(subject);
+                const subTotal = getSubjectTotal(subject, termLabel);
                 const obtained = gbEdits[s.id]?.[subject] !== undefined
                     ? Number(gbEdits[s.id][subject])
                     : (getTermResults(s, termLabel).find(r => r.subject === subject)?.obtained ?? 0);
@@ -229,7 +236,9 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                     row[`${sub} (Marks)`] = r ? r.obtained : '';
                     row[`${sub} (%)`] = r ? r.percentage : '';
                     row[`${sub} (Grade)`] = r ? r.grade : '';
-                    if (WEIGHTS[sub]) row[`${sub} (Weight%)`] = WEIGHTS[sub];
+                    const tLabel = r ? r.term : null;
+                    const w = tLabel ? getSubjectTotal(sub, tLabel) : getSubjectTotal(sub);
+                    if (w !== 100) row[`${sub} (Weight)`] = w;
                 });
                 const avg = results.length ? calcWeightedAvg(results) : '';
                 row['Weighted Avg %'] = avg;
@@ -362,7 +371,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
             const subCells = subs.map(sub => {
                 const r = res.find(r => r.subject === sub);
                 const ob = r ? r.obtained : null;
-                const total = getSubjectTotal(sub);
+                const total = getSubjectTotal(sub, termLabel);
                 const pct = ob !== null ? Math.round((ob / total) * 100) : null;
                 const sc = pct !== null ? gradeColors(pct) : { bg: '#f8fafc', text: '#94a3b8', border: '#e2e8f0' };
                 return `<td style="text-align:center; padding:6px 4px; border:1px solid #e2e8f0; background:${sc.bg}; color:${sc.text}; font-weight:600; font-size:12px;">${ob !== null ? `${ob}<br/><span style='font-size:10px;font-weight:400'>${calcGrade(pct)}</span>` : '—'}</td>`;
@@ -389,7 +398,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         const topStudent = withResults.sort((a, b) => calcOverallPct(getTermResults(b, termLabel)) - calcOverallPct(getTermResults(a, termLabel)))[0];
 
         const subHeaders = subs.map(sub =>
-            `<th style="padding:8px 4px; background:#1e3a5f; color:white; font-size:11px; text-align:center; min-width:80px; border:1px solid #2d4f7c">${sub}<br/><span style='font-weight:400;font-size:10px'>/${getSubjectTotal(sub)}</span></th>`
+            `<th style="padding:8px 4px; background:#1e3a5f; color:white; font-size:11px; text-align:center; min-width:80px; border:1px solid #2d4f7c">${sub}<br/><span style='font-weight:400;font-size:10px'>/${getSubjectTotal(sub, termLabel)}</span></th>`
         ).join('');
 
         const html = `<!DOCTYPE html>

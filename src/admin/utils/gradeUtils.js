@@ -23,7 +23,7 @@ export const calcOverallPct = (results, getSubjectTotal) => {
     if (!results || results.length === 0) return 0;
     let totalObtained = 0, totalMax = 0;
     results.forEach(r => {
-        const subTotal = getSubjectTotal(r.subject);
+        const subTotal = getSubjectTotal(r.subject, r.term);
         const obtained = r.obtained !== undefined ? r.obtained : Math.round((r.percentage / 100) * subTotal);
         totalObtained += obtained;
         totalMax += subTotal;

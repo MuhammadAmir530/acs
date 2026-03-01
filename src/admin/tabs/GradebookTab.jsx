@@ -15,7 +15,14 @@ const GradebookTab = ({
     gbImportFileRef, getCellValue, handleCellEdit, saveRemarks,
 }) => {
     const classSubjects = (SUBJECTS && !Array.isArray(SUBJECTS) ? (SUBJECTS[selectedClass] || []) : []);
-    const getSubjectTotal = (sub) => (WEIGHTS && WEIGHTS[sub]) ? WEIGHTS[sub] : 100;
+    const getSubjectTotal = (sub, term) => {
+        const t = term || gbTerm || TERMS[0] || 'Current';
+        if (WEIGHTS) {
+            if (WEIGHTS[t] && typeof WEIGHTS[t] === 'object' && WEIGHTS[t][sub]) return Number(WEIGHTS[t][sub]);
+            if (typeof WEIGHTS[sub] === 'number') return Number(WEIGHTS[sub]);
+        }
+        return 100;
+    };
 
     const allClassStudents = students.filter(s => s.grade === selectedClass);
     const classStudents = filterByGender(allClassStudents, gbGenderTab)
@@ -153,21 +160,34 @@ const GradebookTab = ({
                             </span>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.5rem' }}>
-                            {classSubjects.map(sub => (
-                                <div key={sub} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.4rem 0.6rem' }}>
-                                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</span>
-                                    <input type="number" min="1" max="9999" value={WEIGHTS[sub] || ''} placeholder="100"
-                                        onChange={e => {
-                                            const val = e.target.value === '' ? undefined : Number(e.target.value);
-                                            const newW = { ...WEIGHTS };
-                                            if (val === undefined || val <= 0) delete newW[sub]; else newW[sub] = val;
-                                            updateWeights(newW);
-                                        }}
-                                        style={{ width: '60px', padding: '0.25rem 0.35rem', border: '1px solid #d1d5db', borderRadius: '6px', textAlign: 'center', fontSize: '0.82rem', fontWeight: 700 }}
-                                    />
-                                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>pts</span>
-                                </div>
-                            ))}
+                            {classSubjects.map(sub => {
+                                const currentTerm = gbTerm || TERMS[0] || 'Current';
+                                const currentW = (WEIGHTS && WEIGHTS[currentTerm] && typeof WEIGHTS[currentTerm] === 'object') ? WEIGHTS[currentTerm][sub] : (WEIGHTS && typeof WEIGHTS[sub] === 'number' ? WEIGHTS[sub] : '');
+                                return (
+                                    <div key={sub} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.4rem 0.6rem' }}>
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</span>
+                                        <input type="number" min="1" max="9999" value={currentW} placeholder="100"
+                                            onChange={e => {
+                                                const val = e.target.value === '' ? undefined : Number(e.target.value);
+                                                const termLabel = gbTerm || TERMS[0] || 'Current';
+                                                const newW = { ...WEIGHTS };
+                                                if (!newW[termLabel] || typeof newW[termLabel] !== 'object') {
+                                                    newW[termLabel] = {};
+                                                }
+                                                if (val === undefined || val <= 0) {
+                                                    delete newW[termLabel][sub];
+                                                    if (Object.keys(newW[termLabel]).length === 0) delete newW[termLabel];
+                                                } else {
+                                                    newW[termLabel][sub] = val;
+                                                }
+                                                updateWeights(newW);
+                                            }}
+                                            style={{ width: '60px', padding: '0.25rem 0.35rem', border: '1px solid #d1d5db', borderRadius: '6px', textAlign: 'center', fontSize: '0.82rem', fontWeight: 700 }}
+                                        />
+                                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>pts</span>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
@@ -252,7 +272,7 @@ const GradebookTab = ({
                                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, fontSize: '0.82rem', position: 'sticky', left: 0, background: '#1e293b', zIndex: 2, minWidth: '180px' }}>Student</th>
                                     {classSubjects.map(sub => (
                                         <th key={sub} style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700, fontSize: '0.78rem', minWidth: '100px' }}>
-                                            {sub}<br /><span style={{ opacity: 0.6, fontWeight: 400 }}>/{getSubjectTotal(sub)}</span>
+                                            {sub}<br /><span style={{ opacity: 0.6, fontWeight: 400 }}>/{getSubjectTotal(sub, gbTerm)}</span>
                                         </th>
                                     ))}
                                     <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700, fontSize: '0.78rem', minWidth: '80px', background: '#0f172a' }}>Wtd Avg%</th>
