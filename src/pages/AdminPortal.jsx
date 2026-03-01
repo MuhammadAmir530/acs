@@ -77,7 +77,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     const getSubjectTotal = (sub, term) => {
         const t = term || gbTerm || TERMS[0] || 'Current';
         if (WEIGHTS) {
-            if (WEIGHTS[t] && typeof WEIGHTS[t] === 'object' && WEIGHTS[t][sub]) return Number(WEIGHTS[t][sub]);
+            if (WEIGHTS[t] && typeof WEIGHTS[t] === 'object' && WEIGHTS[t][sub] !== undefined) return Number(WEIGHTS[t][sub]);
             if (typeof WEIGHTS[sub] === 'number') return Number(WEIGHTS[sub]);
         }
         return 100;

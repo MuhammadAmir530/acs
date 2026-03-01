@@ -18,7 +18,7 @@ const GradebookTab = ({
     const getSubjectTotal = (sub, term) => {
         const t = term || gbTerm || TERMS[0] || 'Current';
         if (WEIGHTS) {
-            if (WEIGHTS[t] && typeof WEIGHTS[t] === 'object' && WEIGHTS[t][sub]) return Number(WEIGHTS[t][sub]);
+            if (WEIGHTS[t] && typeof WEIGHTS[t] === 'object' && WEIGHTS[t][sub] !== undefined) return Number(WEIGHTS[t][sub]);
             if (typeof WEIGHTS[sub] === 'number') return Number(WEIGHTS[sub]);
         }
         return 100;
@@ -162,7 +162,12 @@ const GradebookTab = ({
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.5rem' }}>
                             {classSubjects.map(sub => {
                                 const currentTerm = gbTerm || TERMS[0] || 'Current';
-                                const currentW = (WEIGHTS && WEIGHTS[currentTerm] && typeof WEIGHTS[currentTerm] === 'object') ? WEIGHTS[currentTerm][sub] : (WEIGHTS && typeof WEIGHTS[sub] === 'number' ? WEIGHTS[sub] : '');
+                                let currentW = '';
+                                if (WEIGHTS && WEIGHTS[currentTerm] && typeof WEIGHTS[currentTerm] === 'object' && WEIGHTS[currentTerm][sub] !== undefined) {
+                                    currentW = WEIGHTS[currentTerm][sub];
+                                } else if (WEIGHTS && typeof WEIGHTS[sub] === 'number') {
+                                    currentW = WEIGHTS[sub];
+                                }
                                 return (
                                     <div key={sub} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.4rem 0.6rem' }}>
                                         <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</span>
@@ -170,10 +175,15 @@ const GradebookTab = ({
                                             onChange={e => {
                                                 const val = e.target.value === '' ? undefined : Number(e.target.value);
                                                 const termLabel = gbTerm || TERMS[0] || 'Current';
+
+                                                // Deep clone WEIGHTS slightly to avoid mutating current state objects directly
                                                 const newW = { ...WEIGHTS };
                                                 if (!newW[termLabel] || typeof newW[termLabel] !== 'object') {
                                                     newW[termLabel] = {};
+                                                } else {
+                                                    newW[termLabel] = { ...newW[termLabel] };
                                                 }
+
                                                 if (val === undefined || val <= 0) {
                                                     delete newW[termLabel][sub];
                                                     if (Object.keys(newW[termLabel]).length === 0) delete newW[termLabel];
