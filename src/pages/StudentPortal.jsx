@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     User, Calendar, Award, BarChart3, BookOpen,
     LogOut, TrendingUp, DollarSign, CheckCircle, XCircle,
-    ArrowUp, ArrowDown, Minus, BookMarked
+    ArrowUp, ArrowDown, Minus, BookMarked, Menu, X
 } from 'lucide-react';
 import { useSchoolData } from '../context/SchoolDataContext';
 
@@ -11,6 +11,7 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
     const [activeTab, setActiveTab] = useState('overview');
     const [selectedPrevTerm, setSelectedPrevTerm] = useState(0);
     const [selectedTerm, setSelectedTerm] = useState(TERMS[0] || '');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const handleLogout = () => {
         setIsLoggedIn(false);
@@ -88,21 +89,19 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
     ];
 
     return (
-        <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)', background: '#f8fafc' }}>
+        <div className="dashboard-container">
+            {/* ── MOBILE OVERLAY ── */}
+            <div className={`sidebar-overlay ${isSidebarOpen ? 'open' : ''}`} onClick={() => setIsSidebarOpen(false)}></div>
+
             {/* ── LEFT SIDEBAR ── */}
-            <aside style={{
-                width: '280px',
-                background: 'linear-gradient(180deg, #1e3a5f 0%, #0f172a 100%)',
-                borderRight: '1px solid #334155',
-                display: 'flex',
-                flexDirection: 'column',
-                position: 'sticky',
-                top: '80px',
-                height: 'calc(100vh - 80px)',
-                overflowY: 'auto',
-                boxShadow: '4px 0 15px -3px rgba(0, 0, 0, 0.1)'
-            }}>
-                <div style={{ padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', borderBottom: '1px solid #334155' }}>
+            <aside className={`dashboard-sidebar ${isSidebarOpen ? 'open' : ''}`} style={{ background: 'linear-gradient(180deg, #1e3a5f 0%, #0f172a 100%)' }}>
+                <div style={{ padding: '2rem 1.5rem 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', borderBottom: '1px solid #334155', position: 'relative' }}>
+
+                    {/* Close button for mobile inside sidebar */}
+                    <button className="mobile-menu-btn" style={{ position: 'absolute', top: '10px', right: '10px', color: '#f8fafc', background: 'transparent', border: 'none' }} onClick={() => setIsSidebarOpen(false)}>
+                        <X size={24} />
+                    </button>
+
                     <div style={{
                         width: '72px', height: '72px', borderRadius: '50%',
                         background: 'linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)',
@@ -134,7 +133,7 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                         const isActive = activeTab === tab.id;
 
                         return (
-                            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="btn hover-scale" style={{
+                            <button key={tab.id} onClick={() => { setActiveTab(tab.id); setIsSidebarOpen(false); }} className="btn hover-scale" style={{
                                 justifyContent: 'flex-start',
                                 padding: '0.85rem 1.25rem',
                                 background: isActive ? c.bg : 'transparent',
@@ -161,7 +160,7 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
             </aside>
 
             {/* ── MAIN CONTENT ── */}
-            <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+            <main className="dashboard-main">
 
                 {/* Top Header Row representing the current Active Tab */}
                 <header style={{
@@ -176,13 +175,18 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                     top: 0,
                     zIndex: 5
                 }}>
-                    <div>
-                        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <span style={{ color: '#2563eb' }}>{studentTabs.find(t => t.id === activeTab)?.label}</span>
-                        </h1>
-                        <p style={{ color: '#64748b', margin: '0.25rem 0 0', fontSize: '0.95rem' }}>
-                            {studentTabs.find(t => t.id === activeTab)?.desc}
-                        </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <button className="mobile-menu-btn" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+                            <Menu size={24} />
+                        </button>
+                        <div>
+                            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <span style={{ color: '#2563eb' }}>{studentTabs.find(t => t.id === activeTab)?.label}</span>
+                            </h1>
+                            <p style={{ color: '#64748b', margin: '0.25rem 0 0', fontSize: '0.95rem' }}>
+                                {studentTabs.find(t => t.id === activeTab)?.desc}
+                            </p>
+                        </div>
                     </div>
                 </header>
 

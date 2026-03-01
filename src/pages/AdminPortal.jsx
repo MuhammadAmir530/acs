@@ -5,7 +5,7 @@ import {
     Download, Upload, FileText, Search, Camera,
     BellPlus, Trash2, Megaphone, PlusCircle, Lock,
     Building, School, Check, X, ChevronRight, Layout,
-    GripVertical, ChevronUp, ChevronDown
+    GripVertical, ChevronUp, ChevronDown, Menu
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useSchoolData } from '../context/SchoolDataContext';
@@ -44,6 +44,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
 
     // ── Confirm Modal State ──
     const [confirmModal, setConfirmModal] = useState({ open: false, title: '', message: '', onConfirm: null, danger: true });
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const openConfirm = (title, message, onConfirm, danger = true) => setConfirmModal({ open: true, title, message, onConfirm, danger });
     const closeConfirm = () => setConfirmModal({ open: false, title: '', message: '', onConfirm: null, danger: true });
 
@@ -2185,7 +2186,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     ];
 
     return (
-        <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)', background: 'var(--color-gray-50)', overflowX: 'hidden' }}>
+        <div className="dashboard-container" style={{ overflowX: 'hidden' }}>
             {/* ── Confirm Modal ── */}
             {confirmModal.open && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
@@ -2274,28 +2275,26 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                 </div>
             )}
 
+            {/* ── MOBILE OVERLAY ── */}
+            <div className={`sidebar-overlay ${isSidebarOpen ? 'open' : ''}`} onClick={() => setIsSidebarOpen(false)}></div>
+
             {/* ── LEFT SIDEBAR ── */}
-            <aside style={{
-                width: '280px',
-                background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
-                borderRight: '1px solid #334155',
-                display: 'flex',
-                flexDirection: 'column',
-                position: 'sticky',
-                top: '80px',
-                height: 'calc(100vh - 80px)',
-                overflowY: 'auto',
-                boxShadow: '4px 0 15px -3px rgba(0, 0, 0, 0.1)'
-            }}>
-                <div style={{ padding: '1.75rem 1.5rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.875rem', borderBottom: '1px solid #334155' }}>
-                    <div style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)', color: 'white', padding: '0.6rem', borderRadius: '12px', boxShadow: '0 4px 10px rgba(59, 130, 246, 0.3)' }}>
-                        <School size={22} strokeWidth={2.5} />
+            <aside className={`dashboard-sidebar ${isSidebarOpen ? 'open' : ''}`}>
+                <div style={{ padding: '1.75rem 1.5rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #334155' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+                        <div style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)', color: 'white', padding: '0.6rem', borderRadius: '12px', boxShadow: '0 4px 10px rgba(59, 130, 246, 0.3)' }}>
+                            <School size={22} strokeWidth={2.5} />
+                        </div>
+                        <span style={{ fontWeight: 800, fontSize: '1.2rem', color: '#f8fafc', letterSpacing: '0.5px' }}>Control Panel</span>
                     </div>
-                    <span style={{ fontWeight: 800, fontSize: '1.2rem', color: '#f8fafc', letterSpacing: '0.5px' }}>Control Panel</span>
+                    {/* Close button inside sidebar for mobile only */}
+                    <button className="mobile-menu-btn" style={{ color: '#f8fafc' }} onClick={() => setIsSidebarOpen(false)}>
+                        <X size={24} />
+                    </button>
                 </div>
 
                 <nav style={{ padding: '1.25rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <button onClick={() => setActiveTab('dashboard')} className="btn hover-scale" style={{
+                    <button onClick={() => { setActiveTab('dashboard'); setIsSidebarOpen(false); }} className="btn hover-scale" style={{
                         justifyContent: 'flex-start',
                         padding: '0.85rem 1.25rem',
                         background: activeTab === 'dashboard' ? 'linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)' : 'transparent',
@@ -2330,7 +2329,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                         const isActive = activeTab === tab.id;
 
                         return (
-                            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="btn hover-scale" style={{
+                            <button key={tab.id} onClick={() => { setActiveTab(tab.id); setIsSidebarOpen(false); }} className="btn hover-scale" style={{
                                 justifyContent: 'flex-start',
                                 padding: '0.85rem 1.25rem',
                                 background: isActive ? c.bg : 'transparent',
@@ -2360,7 +2359,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
             </aside>
 
             {/* ── MAIN CONTENT ── */}
-            <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+            <main className="dashboard-main">
 
                 {/* Top Header Row representing the current Active Tab */}
                 <header style={{
@@ -2375,14 +2374,19 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                     top: 0,
                     zIndex: 5
                 }}>
-                    <div>
-                        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            {activeTab === 'dashboard' ? <><Layout size={28} color="#2563eb" /> Overview</> :
-                                <><span style={{ color: '#2563eb' }}>{adminTabs.find(t => t.id === activeTab)?.label}</span></>}
-                        </h1>
-                        <p style={{ color: '#64748b', margin: '0.25rem 0 0', fontSize: '0.95rem' }}>
-                            {activeTab === 'dashboard' ? 'Welcome to your administration control center.' : adminTabs.find(t => t.id === activeTab)?.desc}
-                        </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <button className="mobile-menu-btn" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+                            <Menu size={24} />
+                        </button>
+                        <div>
+                            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                {activeTab === 'dashboard' ? <><Layout size={28} color="#2563eb" /> Overview</> :
+                                    <><span style={{ color: '#2563eb' }}>{adminTabs.find(t => t.id === activeTab)?.label}</span></>}
+                            </h1>
+                            <p style={{ color: '#64748b', margin: '0.25rem 0 0', fontSize: '0.95rem' }}>
+                                {activeTab === 'dashboard' ? 'Welcome to your administration control center.' : adminTabs.find(t => t.id === activeTab)?.desc}
+                            </p>
+                        </div>
                     </div>
                 </header>
 
