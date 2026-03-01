@@ -26,7 +26,7 @@ const StudentEditModal = lazy(() => import('../admin/modals/StudentEditModal'));
 
 const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
     const { schoolData, CLASSES, SUBJECTS, TERMS, SECTIONS, WEIGHTS, fetchData, setStudents, setFaculty, updateSchoolInfo, setAnnouncements, updateClasses, updateSubjects, updateTerms, updateSections, updateWeights, adminCredentials, changeAdminPassword } = useSchoolData();
-    const [activeTab, setActiveTab] = useState('admissions');
+    const [activeTab, setActiveTab] = useState('dashboard');
     const [saveMessage, setSaveMessage] = useState('');
     const sectionClasses = (SECTIONS || []).flatMap(s => s.classes || []);
     const [selectedClass, setSelectedClass] = useState(sectionClasses[0] || '');
@@ -2171,10 +2171,21 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
         transition: 'all var(--transition-base)'
     };
 
+    const adminTabs = [
+        { id: 'admissions', label: 'Admissions Desk', icon: PlusCircle, desc: 'Handle new enrollments and student applications.' },
+        { id: 'classes', label: 'Classes & Sections', icon: Users, desc: 'Configure classrooms and manage student rosters.' },
+        { id: 'marks', label: 'Manage Exams', icon: Award, desc: 'Input exam marks and configure subject weights.' },
+        { id: 'attendance', label: 'Attendance', icon: Calendar, desc: 'Track daily attendance and absentees.' },
+        { id: 'fees', label: 'Fee Management', icon: DollarSign, desc: 'Record tuition fees and payments.' },
+        { id: 'reports', label: 'Report Cards', icon: FileText, desc: 'View analysis and print student report cards.' },
+        { id: 'faculty', label: 'Faculty & Teachers', icon: User, desc: 'Manage your teaching staff profiles.' },
+        { id: 'announcements', label: 'Noticeboard', icon: Megaphone, desc: 'Broadcast notices to portals.' },
+        { id: 'facilities', label: 'School Facilities', icon: Building, desc: 'List and update school infrastructure.' },
+        { id: 'blog', label: 'Website Blog', icon: Layout, desc: 'Post stories and news to the public website.' }
+    ];
 
     return (
-        <div style={{ background: 'var(--color-gray-50)', minHeight: 'calc(100vh - 80px)' }}>
-
+        <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)', background: 'var(--color-gray-50)', overflowX: 'hidden' }}>
             {/* ── Confirm Modal ── */}
             {confirmModal.open && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
@@ -2256,196 +2267,357 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
             <input type="file" ref={blogImageRef} onChange={handleBlogImageUpload} accept="image/*" style={{ display: 'none' }} />
             <input type="file" ref={classImportFileRef} onChange={importStudentsExcel} accept=".xlsx,.xls" style={{ display: 'none' }} />
 
-            {/* ── Page Header ── */}
-            <section style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 50%, #1a7a4f 100%)', color: 'white', padding: '3rem 0 2rem' }}>
-                <div className="container">
-                    <div className="flex-between" style={{ flexWrap: 'wrap', gap: '1rem' }}>
-                        <div>
-                            <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.5rem)', fontWeight: 'var(--font-weight-bold)', marginBottom: '0.5rem' }}>Admin Portal</h1>
-                            <p style={{ opacity: 0.95 }}>Manage student marks, attendance &amp; fees</p>
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                            <button onClick={() => { setNewAdminUser(adminCredentials.username || ''); setShowChangePwd(true); }} className="btn" style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: '2px solid rgba(255,255,255,0.5)' }}>
-                                <Lock size={16} /> Change Password
-                            </button>
-                            <button onClick={handleLogout} className="btn" style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: '2px solid white' }}>
-                                <LogOut size={18} /> Logout
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
             {/* ── Save Toast ── */}
             {saveMessage && (
-                <div className="animate-fade-in" style={{ position: 'fixed', top: '100px', right: '20px', background: 'var(--color-success)', color: 'white', padding: '1rem 1.5rem', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-xl)', zIndex: 1000, display: 'flex', gap: '0.5rem', alignItems: 'center', fontWeight: 'var(--font-weight-semibold)' }}>
+                <div className="animate-fade-in" style={{ position: 'fixed', top: '20px', right: '20px', background: 'var(--color-success)', color: 'white', padding: '1rem 1.5rem', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-xl)', zIndex: 1000, display: 'flex', gap: '0.5rem', alignItems: 'center', fontWeight: 'var(--font-weight-semibold)' }}>
                     <CheckCircle size={20} /> {saveMessage}
                 </div>
             )}
 
-            {/* ── Navigation Tabs ── */}
-            <section className="bg-white" style={{ borderBottom: '1px solid var(--color-gray-200)', position: 'sticky', top: '80px', zIndex: 10 }}>
-                <div className="container">
-                    <div className="flex gap-1" style={{ overflowX: 'auto', padding: '0.5rem 0' }}>
-                        {[
-                            { id: 'admissions', label: 'Admissions', icon: PlusCircle },
-                            { id: 'marks', label: 'Gradebook', icon: Award },
-                            { id: 'reports', label: 'Reports', icon: FileText },
-                            { id: 'attendance', label: 'Attendance', icon: Calendar },
-                            { id: 'fees', label: 'Fee Status', icon: DollarSign },
-                            { id: 'classes', label: 'Class Lists', icon: Users },
-                            { id: 'announcements', label: 'Announcements', icon: Megaphone },
-                            { id: 'faculty', label: 'Faculty', icon: Users },
-                            { id: 'facilities', label: 'Facilities', icon: Building },
-                            { id: 'blog', label: 'Blog Posts', icon: FileText },
-                        ].map(tab => (
-                            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="flex gap-2" style={{
-                                padding: '0.75rem 1.5rem', fontWeight: 'var(--font-weight-semibold)',
-                                color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-gray-600)',
-                                borderBottom: activeTab === tab.id ? '3px solid var(--color-primary)' : '3px solid transparent',
-                                transition: 'all var(--transition-base)', whiteSpace: 'nowrap', alignItems: 'center'
-                            }}>
-                                <tab.icon size={18} />{tab.label}
-                            </button>
-                        ))}
+            {/* ── LEFT SIDEBAR ── */}
+            <aside style={{
+                width: '280px',
+                background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
+                borderRight: '1px solid #334155',
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'sticky',
+                top: '80px',
+                height: 'calc(100vh - 80px)',
+                overflowY: 'auto',
+                boxShadow: '4px 0 15px -3px rgba(0, 0, 0, 0.1)'
+            }}>
+                <div style={{ padding: '1.75rem 1.5rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.875rem', borderBottom: '1px solid #334155' }}>
+                    <div style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)', color: 'white', padding: '0.6rem', borderRadius: '12px', boxShadow: '0 4px 10px rgba(59, 130, 246, 0.3)' }}>
+                        <School size={22} strokeWidth={2.5} />
                     </div>
+                    <span style={{ fontWeight: 800, fontSize: '1.2rem', color: '#f8fafc', letterSpacing: '0.5px' }}>Control Panel</span>
                 </div>
-            </section>
 
-            {/* ── Tab Content ── */}
-            <section className="section">
-                <div className="container">
-                    <Suspense fallback={<div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>Loading…</div>}>
+                <nav style={{ padding: '1.25rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <button onClick={() => setActiveTab('dashboard')} className="btn hover-scale" style={{
+                        justifyContent: 'flex-start',
+                        padding: '0.85rem 1.25rem',
+                        background: activeTab === 'dashboard' ? 'linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)' : 'transparent',
+                        color: activeTab === 'dashboard' ? 'white' : '#94a3b8',
+                        fontWeight: activeTab === 'dashboard' ? 700 : 500,
+                        border: 'none',
+                        boxShadow: activeTab === 'dashboard' ? '0 4px 12px -3px rgba(37, 99, 235, 0.4)' : 'none',
+                        borderRadius: '12px',
+                        width: '100%',
+                        textAlign: 'left',
+                        transition: 'all 0.2s ease'
+                    }}>
+                        <Layout size={20} style={{ marginRight: '0.75rem', opacity: activeTab === 'dashboard' ? 1 : 0.7 }} /> Dashboard
+                    </button>
 
-                        {/* Gradebook */}
-                        {activeTab === 'marks' && (
-                            <GradebookTab
-                                students={students} selectedClass={selectedClass} setSelectedClass={setSelectedClass} sectionClasses={sectionClasses}
-                                TERMS={TERMS} SUBJECTS={SUBJECTS} WEIGHTS={WEIGHTS}
-                                gbTerm={gbTerm} setGbTerm={setGbTerm} gbGenderTab={gbGenderTab} setGbGenderTab={setGbGenderTab}
-                                gbEdits={gbEdits} setGbEdits={setGbEdits} gbSaving={gbSaving}
-                                showGbStats={showGbStats} setShowGbStats={setShowGbStats}
-                                showGbSettings={showGbSettings} setShowGbSettings={setShowGbSettings}
-                                newSubjectInput={newSubjectInput} setNewSubjectInput={setNewSubjectInput}
-                                newTermInput={newTermInput} setNewTermInput={setNewTermInput}
-                                updateClassSubjects={updateClassSubjects} updateTerms={updateTerms} updateWeights={updateWeights}
-                                saveGradebook={saveGradebook} downloadGradebookTemplate={downloadGradebookTemplate}
-                                exportGradebookExcel={exportGradebookExcel} archiveTerm={archiveTerm}
-                                exportResultPDF={exportResultPDF} importGradebookExcel={importGradebookExcel}
-                                gbImportFileRef={gbImportFileRef} getCellValue={getCellValue}
-                                handleCellEdit={handleCellEdit} saveRemarks={saveRemarks}
-                            />
-                        )}
+                    <div style={{ margin: '1.5rem 0 0.5rem 1.25rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px' }}>Modules</div>
 
-                        {/* Attendance */}
-                        {activeTab === 'attendance' && (
-                            <AttendanceTab
-                                students={students} selectedClass={selectedClass} setSelectedClass={setSelectedClass} sectionClasses={sectionClasses}
-                                attDateFilter={attDateFilter} setAttDateFilter={setAttDateFilter}
-                                markAttendance={markAttendance} removeAttendanceRecord={removeAttendanceRecord}
-                                exportAttendanceExcel={exportAttendanceExcel} fetchData={fetchData}
-                                showSaveMessage={showSaveMessage} openConfirm={openConfirm}
-                            />
-                        )}
+                    {adminTabs.map((tab, idx) => {
+                        const tabColors = [
+                            { bg: 'linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)', shadow: 'rgba(37, 99, 235, 0.4)' },
+                            { bg: 'linear-gradient(90deg, #d946ef 0%, #c026d3 100%)', shadow: 'rgba(217, 70, 239, 0.4)' },
+                            { bg: 'linear-gradient(90deg, #10b981 0%, #059669 100%)', shadow: 'rgba(16, 185, 129, 0.4)' },
+                            { bg: 'linear-gradient(90deg, #f97316 0%, #ea580c 100%)', shadow: 'rgba(249, 115, 22, 0.4)' },
+                            { bg: 'linear-gradient(90deg, #8b5cf6 0%, #7c3aed 100%)', shadow: 'rgba(139, 92, 246, 0.4)' },
+                            { bg: 'linear-gradient(90deg, #14b8a6 0%, #0d9488 100%)', shadow: 'rgba(20, 184, 166, 0.4)' },
+                            { bg: 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)', shadow: 'rgba(239, 68, 68, 0.4)' },
+                            { bg: 'linear-gradient(90deg, #eab308 0%, #ca8a04 100%)', shadow: 'rgba(234, 179, 8, 0.4)' },
+                            { bg: 'linear-gradient(90deg, #64748b 0%, #475569 100%)', shadow: 'rgba(100, 116, 139, 0.4)' },
+                            { bg: 'linear-gradient(90deg, #ec4899 0%, #db2777 100%)', shadow: 'rgba(236, 72, 153, 0.4)' }
+                        ];
+                        const c = tabColors[idx % tabColors.length];
+                        const isActive = activeTab === tab.id;
 
-                        {/* Fee */}
-                        {activeTab === 'fees' && (
-                            <FeeTab
-                                students={students} selectedClass={selectedClass} setSelectedClass={setSelectedClass} sectionClasses={sectionClasses}
-                                openNewFeeMonth={openNewFeeMonth} toggleMonthFeeStatus={toggleMonthFeeStatus}
-                                markAllPaidForMonth={markAllPaidForMonth} markAllUnpaidForMonth={markAllUnpaidForMonth}
-                                deleteFeeMonth={deleteFeeMonth}
-                            />
-                        )}
+                        return (
+                            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="btn hover-scale" style={{
+                                justifyContent: 'flex-start',
+                                padding: '0.85rem 1.25rem',
+                                background: isActive ? c.bg : 'transparent',
+                                color: isActive ? 'white' : '#94a3b8',
+                                fontWeight: isActive ? 700 : 500,
+                                border: 'none',
+                                boxShadow: isActive ? `0 4px 12px -3px ${c.shadow}` : 'none',
+                                borderRadius: '12px',
+                                width: '100%',
+                                textAlign: 'left',
+                                transition: 'all 0.2s ease'
+                            }}>
+                                <tab.icon size={20} style={{ marginRight: '0.75rem', opacity: isActive ? 1 : 0.7 }} /> {tab.label}
+                            </button>
+                        );
+                    })}
+                </nav>
 
-                        {/* Admissions */}
-                        {activeTab === 'admissions' && (
-                            <AdmissionsTab
-                                admissionData={admissionData} setAdmissionData={setAdmissionData}
-                                admissionInitialState={admissionInitialState}
-                                printAdmissionForm={printAdmissionForm}
-                                handleAdmissionPhotoUpload={handleAdmissionPhotoUpload}
-                                photoFileRef={photoFileRef} sectionClasses={sectionClasses}
-                            />
-                        )}
-
-                        {/* Reports */}
-                        {activeTab === 'reports' && (
-                            <ReportsTab
-                                students={students} reportSearch={reportSearch} setReportSearch={setReportSearch}
-                                downloadStudentReport={downloadStudentReport}
-                            />
-                        )}
-
-                        {/* Announcements */}
-                        {activeTab === 'announcements' && (
-                            <AnnouncementsTab
-                                schoolData={schoolData}
-                                newAnnouncement={newAnnouncement} setNewAnnouncement={setNewAnnouncement}
-                                addAnnouncement={addAnnouncement} deleteAnnouncement={deleteAnnouncement}
-                            />
-                        )}
-
-                        {/* Faculty */}
-                        {activeTab === 'faculty' && (
-                            <FacultyTab
-                                schoolData={schoolData}
-                                editingFacultyId={editingFacultyId} setEditingFacultyId={setEditingFacultyId}
-                                tempFacultyMember={tempFacultyMember} setTempFacultyMember={setTempFacultyMember}
-                                addFaculty={addFaculty} saveFaculty={saveFaculty} deleteFaculty={deleteFaculty}
-                                facultyFileRef={facultyFileRef}
-                            />
-                        )}
-
-                        {/* Facilities */}
-                        {activeTab === 'facilities' && (
-                            <FacilitiesTab
-                                schoolData={schoolData}
-                                editingFacilityId={editingFacilityId} setEditingFacilityId={setEditingFacilityId}
-                                tempFacility={tempFacility} setTempFacility={setTempFacility}
-                                addFacility={addFacility} saveFacility={saveFacility} deleteFacility={deleteFacility}
-                                facilityFileRef={facilityFileRef}
-                            />
-                        )}
-
-                        {/* Blog */}
-                        {activeTab === 'blog' && (
-                            <BlogTab
-                                schoolData={schoolData}
-                                editingBlogId={editingBlogId} setEditingBlogId={setEditingBlogId}
-                                tempBlog={tempBlog} setTempBlog={setTempBlog}
-                                addBlog={addBlog} saveBlog={saveBlog} deleteBlog={deleteBlog}
-                                blogImageRef={blogImageRef}
-                            />
-                        )}
-
-                        {/* Class Lists */}
-                        {activeTab === 'classes' && (
-                            <ClassListsTab
-                                students={students} setStudents={setStudents}
-                                SECTIONS={SECTIONS} CLASSES={CLASSES}
-                                updateSections={updateSections} updateClasses={updateClasses}
-                                sectionClasses={sectionClasses}
-                                selectedClassForList={selectedClassForList} setSelectedClassForList={setSelectedClassForList}
-                                viewingClass={viewingClass} setViewingClass={setViewingClass}
-                                classDetailTab={classDetailTab} setClassDetailTab={setClassDetailTab}
-                                newSectionName={newSectionName} setNewSectionName={setNewSectionName}
-                                newClassName={newClassName} setNewClassName={setNewClassName}
-                                editingSectionId={editingSectionId} setEditingSectionId={setEditingSectionId}
-                                editingSectionName={editingSectionName} setEditingSectionName={setEditingSectionName}
-                                selectedSectionId={selectedSectionId} setSelectedSectionId={setSelectedSectionId}
-                                editingStudentId={editingStudentId} setEditingStudentId={setEditingStudentId}
-                                editStudentData={editStudentData} setEditStudentData={setEditStudentData}
-                                classImportFileRef={classImportFileRef} importStudentsExcel={importStudentsExcel}
-                                exportClassRoster={exportClassRoster}
-                                setActiveTab={setActiveTab} setAdmissionData={setAdmissionData}
-                                showSaveMessage={showSaveMessage} openConfirm={openConfirm}
-                            />
-                        )}
-
-                    </Suspense>
+                <div style={{ marginTop: 'auto', padding: '1.5rem', borderTop: '1px solid #334155' }}>
+                    <button onClick={() => { setNewAdminUser(adminCredentials.username || ''); setShowChangePwd(true); }} className="btn hover-scale" style={{ width: '100%', justifyContent: 'center', marginBottom: '0.75rem', background: 'rgba(255,255,255,0.05)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}>
+                        <Lock size={16} /> Admin Config
+                    </button>
+                    <button onClick={handleLogout} className="btn hover-scale" style={{ width: '100%', justifyContent: 'center', background: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '10px' }}>
+                        <LogOut size={16} /> Logout
+                    </button>
                 </div>
-            </section>
+            </aside>
+
+            {/* ── MAIN CONTENT ── */}
+            <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+
+                {/* Top Header Row representing the current Active Tab */}
+                <header style={{
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    backdropFilter: 'blur(12px)',
+                    borderBottom: '1px solid #e2e8f0',
+                    padding: '1.5rem 2.5rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 5
+                }}>
+                    <div>
+                        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            {activeTab === 'dashboard' ? <><Layout size={28} color="#2563eb" /> Overview</> :
+                                <><span style={{ color: '#2563eb' }}>{adminTabs.find(t => t.id === activeTab)?.label}</span></>}
+                        </h1>
+                        <p style={{ color: '#64748b', margin: '0.25rem 0 0', fontSize: '0.95rem' }}>
+                            {activeTab === 'dashboard' ? 'Welcome to your administration control center.' : adminTabs.find(t => t.id === activeTab)?.desc}
+                        </p>
+                    </div>
+                </header>
+
+                <div style={{ padding: '2.5rem', width: '100%', maxWidth: '1400px', margin: '0 auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    {/* ── Dashboard Grid Menu ── */}
+                    {activeTab === 'dashboard' && (
+                        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+
+                            {/* Welcome Banner */}
+                            <div style={{
+                                background: 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)',
+                                borderRadius: '24px',
+                                padding: '3rem 2.5rem',
+                                color: 'white',
+                                boxShadow: '0 20px 25px -5px rgba(59, 130, 246, 0.25), 0 10px 10px -5px rgba(59, 130, 246, 0.1)',
+                                position: 'relative',
+                                overflow: 'hidden'
+                            }}>
+                                <div style={{ position: 'relative', zIndex: 2, maxWidth: '600px' }}>
+                                    <h2 style={{ fontSize: '2.5rem', fontWeight: 800, margin: '0 0 0.5rem', lineHeight: 1.1 }}>Good Morning, Admin!</h2>
+                                    <p style={{ fontSize: '1.1rem', opacity: 0.9, margin: 0 }}>Here is what's happening at your school today. Select a module below to manage operations.</p>
+                                </div>
+                                {/* Decorative Circles */}
+                                <div style={{ position: 'absolute', right: '-5%', top: '-20%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 70%)', borderRadius: '50%', zIndex: 1 }}></div>
+                                <div style={{ position: 'absolute', right: '15%', bottom: '-40%', width: '250px', height: '250px', background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%)', borderRadius: '50%', zIndex: 1 }}></div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                                {adminTabs.map((tab, idx) => {
+                                    // Assign distinct colors based on index to make the grid pop
+                                    const colors = [
+                                        { bg: '#eff6ff', icon: '#3b82f6', border: '#bfdbfe', grad: 'linear-gradient(135deg, white 0%, #eff6ff 100%)' }, // Blue
+                                        { bg: '#fdf4ff', icon: '#d946ef', border: '#fbcfe8', grad: 'linear-gradient(135deg, white 0%, #fae8ff 100%)' }, // Fuchsia
+                                        { bg: '#ecfdf5', icon: '#10b981', border: '#a7f3d0', grad: 'linear-gradient(135deg, white 0%, #d1fae5 100%)' }, // Emerald
+                                        { bg: '#fff7ed', icon: '#f97316', border: '#fed7aa', grad: 'linear-gradient(135deg, white 0%, #ffedd5 100%)' }, // Orange
+                                        { bg: '#f5f3ff', icon: '#8b5cf6', border: '#ddd6fe', grad: 'linear-gradient(135deg, white 0%, #ede9fe 100%)' }, // Violet
+                                        { bg: '#f0fdfa', icon: '#14b8a6', border: '#99f6e4', grad: 'linear-gradient(135deg, white 0%, #ccfbf1 100%)' }, // Teal
+                                        { bg: '#fef2f2', icon: '#ef4444', border: '#fecaca', grad: 'linear-gradient(135deg, white 0%, #fee2e2 100%)' }, // Red
+                                        { bg: '#fefce8', icon: '#eab308', border: '#fef08a', grad: 'linear-gradient(135deg, white 0%, #fef9c3 100%)' }, // Yellow
+                                        { bg: '#f8fafc', icon: '#64748b', border: '#e2e8f0', grad: 'linear-gradient(135deg, white 0%, #f1f5f9 100%)' }, // Slate
+                                        { bg: '#fdf2f8', icon: '#ec4899', border: '#fbcfe8', grad: 'linear-gradient(135deg, white 0%, #fce7f3 100%)' }  // Pink
+                                    ];
+                                    const c = colors[idx % colors.length];
+
+                                    return (
+                                        <div
+                                            key={tab.id}
+                                            onClick={() => setActiveTab(tab.id)}
+                                            className="card"
+                                            style={{
+                                                padding: '2rem 1.75rem',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'flex-start',
+                                                textAlign: 'left',
+                                                gap: '1.25rem',
+                                                transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                                                border: '1px solid #e2e8f0',
+                                                borderTop: `5px solid ${c.icon}`,
+                                                background: c.grad,
+                                                borderRadius: '20px',
+                                                position: 'relative',
+                                                overflow: 'hidden'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                                                e.currentTarget.style.boxShadow = `0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px ${c.icon}40`;
+                                                e.currentTarget.style.borderColor = c.border;
+                                                const iconBg = e.currentTarget.querySelector('.icon-bg');
+                                                if (iconBg) iconBg.style.transform = 'scale(1.15) rotate(5deg)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                                e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                                                e.currentTarget.style.borderColor = '#e2e8f0';
+                                                const iconBg = e.currentTarget.querySelector('.icon-bg');
+                                                if (iconBg) iconBg.style.transform = 'scale(1) rotate(0deg)';
+                                            }}
+                                        >
+                                            <div className="icon-bg" style={{
+                                                background: c.bg,
+                                                padding: '1.25rem',
+                                                borderRadius: '16px',
+                                                color: c.icon,
+                                                boxShadow: `inset 0 2px 4px rgba(255,255,255,0.5), 0 4px 6px -1px ${c.icon}20`,
+                                                transition: 'transform 0.3s ease'
+                                            }}>
+                                                <tab.icon size={36} strokeWidth={2.5} />
+                                            </div>
+                                            <div>
+                                                <h3 style={{ fontWeight: 800, fontSize: '1.2rem', color: '#0f172a', marginBottom: '0.4rem', letterSpacing: '-0.3px' }}>{tab.label}</h3>
+                                                <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: 1.5, margin: 0 }}>{tab.desc}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Tab Content ── */}
+                    {activeTab !== 'dashboard' && (
+                        <div className="animate-fade-in">
+                            <Suspense fallback={<div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>Loading Module…</div>}>
+                                {/* Gradebook */}
+                                {activeTab === 'marks' && (
+                                    <GradebookTab
+                                        students={students} selectedClass={selectedClass} setSelectedClass={setSelectedClass} sectionClasses={sectionClasses}
+                                        TERMS={TERMS} SUBJECTS={SUBJECTS} WEIGHTS={WEIGHTS}
+                                        gbTerm={gbTerm} setGbTerm={setGbTerm} gbGenderTab={gbGenderTab} setGbGenderTab={setGbGenderTab}
+                                        gbEdits={gbEdits} setGbEdits={setGbEdits} gbSaving={gbSaving}
+                                        showGbStats={showGbStats} setShowGbStats={setShowGbStats}
+                                        showGbSettings={showGbSettings} setShowGbSettings={setShowGbSettings}
+                                        newSubjectInput={newSubjectInput} setNewSubjectInput={setNewSubjectInput}
+                                        newTermInput={newTermInput} setNewTermInput={setNewTermInput}
+                                        updateClassSubjects={updateClassSubjects} updateTerms={updateTerms} updateWeights={updateWeights}
+                                        saveGradebook={saveGradebook} downloadGradebookTemplate={downloadGradebookTemplate}
+                                        exportGradebookExcel={exportGradebookExcel} archiveTerm={archiveTerm}
+                                        exportResultPDF={exportResultPDF} importGradebookExcel={importGradebookExcel}
+                                        gbImportFileRef={gbImportFileRef} getCellValue={getCellValue}
+                                        handleCellEdit={handleCellEdit} saveRemarks={saveRemarks}
+                                    />
+                                )}
+
+                                {/* Attendance */}
+                                {activeTab === 'attendance' && (
+                                    <AttendanceTab
+                                        students={students} selectedClass={selectedClass} setSelectedClass={setSelectedClass} sectionClasses={sectionClasses}
+                                        attDateFilter={attDateFilter} setAttDateFilter={setAttDateFilter}
+                                        markAttendance={markAttendance} removeAttendanceRecord={removeAttendanceRecord}
+                                        exportAttendanceExcel={exportAttendanceExcel} fetchData={fetchData}
+                                        showSaveMessage={showSaveMessage} openConfirm={openConfirm}
+                                    />
+                                )}
+
+                                {/* Fee */}
+                                {activeTab === 'fees' && (
+                                    <FeeTab
+                                        students={students} selectedClass={selectedClass} setSelectedClass={setSelectedClass} sectionClasses={sectionClasses}
+                                        openNewFeeMonth={openNewFeeMonth} toggleMonthFeeStatus={toggleMonthFeeStatus}
+                                        markAllPaidForMonth={markAllPaidForMonth} markAllUnpaidForMonth={markAllUnpaidForMonth}
+                                        deleteFeeMonth={deleteFeeMonth}
+                                    />
+                                )}
+
+                                {/* Admissions */}
+                                {activeTab === 'admissions' && (
+                                    <AdmissionsTab
+                                        admissionData={admissionData} setAdmissionData={setAdmissionData}
+                                        admissionInitialState={admissionInitialState}
+                                        printAdmissionForm={printAdmissionForm}
+                                        handleAdmissionPhotoUpload={handleAdmissionPhotoUpload}
+                                        photoFileRef={photoFileRef} sectionClasses={sectionClasses}
+                                    />
+                                )}
+
+                                {/* Reports */}
+                                {activeTab === 'reports' && (
+                                    <ReportsTab
+                                        students={students} reportSearch={reportSearch} setReportSearch={setReportSearch}
+                                        downloadStudentReport={downloadStudentReport}
+                                    />
+                                )}
+
+                                {/* Announcements */}
+                                {activeTab === 'announcements' && (
+                                    <AnnouncementsTab
+                                        schoolData={schoolData}
+                                        newAnnouncement={newAnnouncement} setNewAnnouncement={setNewAnnouncement}
+                                        addAnnouncement={addAnnouncement} deleteAnnouncement={deleteAnnouncement}
+                                    />
+                                )}
+
+                                {/* Faculty */}
+                                {activeTab === 'faculty' && (
+                                    <FacultyTab
+                                        schoolData={schoolData}
+                                        editingFacultyId={editingFacultyId} setEditingFacultyId={setEditingFacultyId}
+                                        tempFacultyMember={tempFacultyMember} setTempFacultyMember={setTempFacultyMember}
+                                        addFaculty={addFaculty} saveFaculty={saveFaculty} deleteFaculty={deleteFaculty}
+                                        facultyFileRef={facultyFileRef}
+                                    />
+                                )}
+
+                                {/* Facilities */}
+                                {activeTab === 'facilities' && (
+                                    <FacilitiesTab
+                                        schoolData={schoolData}
+                                        editingFacilityId={editingFacilityId} setEditingFacilityId={setEditingFacilityId}
+                                        tempFacility={tempFacility} setTempFacility={setTempFacility}
+                                        addFacility={addFacility} saveFacility={saveFacility} deleteFacility={deleteFacility}
+                                        facilityFileRef={facilityFileRef}
+                                    />
+                                )}
+
+                                {/* Blog */}
+                                {activeTab === 'blog' && (
+                                    <BlogTab
+                                        schoolData={schoolData}
+                                        editingBlogId={editingBlogId} setEditingBlogId={setEditingBlogId}
+                                        tempBlog={tempBlog} setTempBlog={setTempBlog}
+                                        addBlog={addBlog} saveBlog={saveBlog} deleteBlog={deleteBlog}
+                                        blogImageRef={blogImageRef}
+                                    />
+                                )}
+
+                                {/* Class Lists */}
+                                {activeTab === 'classes' && (
+                                    <ClassListsTab
+                                        students={students} setStudents={setStudents}
+                                        SECTIONS={SECTIONS} CLASSES={CLASSES}
+                                        updateSections={updateSections} updateClasses={updateClasses}
+                                        sectionClasses={sectionClasses}
+                                        selectedClassForList={selectedClassForList} setSelectedClassForList={setSelectedClassForList}
+                                        viewingClass={viewingClass} setViewingClass={setViewingClass}
+                                        classDetailTab={classDetailTab} setClassDetailTab={setClassDetailTab}
+                                        newSectionName={newSectionName} setNewSectionName={setNewSectionName}
+                                        newClassName={newClassName} setNewClassName={setNewClassName}
+                                        editingSectionId={editingSectionId} setEditingSectionId={setEditingSectionId}
+                                        editingSectionName={editingSectionName} setEditingSectionName={setEditingSectionName}
+                                        selectedSectionId={selectedSectionId} setSelectedSectionId={setSelectedSectionId}
+                                        editingStudentId={editingStudentId} setEditingStudentId={setEditingStudentId}
+                                        editStudentData={editStudentData} setEditStudentData={setEditStudentData}
+                                        classImportFileRef={classImportFileRef} importStudentsExcel={importStudentsExcel}
+                                        exportClassRoster={exportClassRoster}
+                                        setActiveTab={setActiveTab} setAdmissionData={setAdmissionData}
+                                        showSaveMessage={showSaveMessage} openConfirm={openConfirm}
+                                    />
+                                )}
+                            </Suspense>
+                        </div>
+                    )}
+                </div>
+            </main>
         </div>
     );
 };

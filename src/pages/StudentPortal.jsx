@@ -79,116 +79,114 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
         border: '1px solid rgba(0,0,0,0.05)'
     };
 
-    return (
-        <div style={{ background: '#f8fafc', minHeight: 'calc(100vh - 80px)' }}>
-            {/* ─── Header ─── */}
-            <section style={{
-                background: 'linear-gradient(135deg, #1e3a5f 0%, #2563eb 50%, #0ea5e9 100%)',
-                color: 'white',
-                padding: '3rem 0 2.5rem',
-                position: 'relative',
-                overflow: 'hidden'
-            }}>
-                {/* Decorative blobs */}
-                <div style={{
-                    position: 'absolute', top: '-60px', right: '-60px',
-                    width: '200px', height: '200px', borderRadius: '50%',
-                    background: 'rgba(255,255,255,0.06)'
-                }} />
-                <div style={{
-                    position: 'absolute', bottom: '-40px', left: '10%',
-                    width: '140px', height: '140px', borderRadius: '50%',
-                    background: 'rgba(255,255,255,0.04)'
-                }} />
-                <div className="container">
-                    <div className="flex-between" style={{ flexWrap: 'wrap', gap: '1rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-                            {/* Avatar */}
-                            <div style={{
-                                width: '64px', height: '64px', borderRadius: '50%',
-                                background: 'rgba(255,255,255,0.2)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: '1.6rem', fontWeight: 700,
-                                border: '3px solid rgba(255,255,255,0.35)',
-                                backdropFilter: 'blur(4px)'
-                            }}>
-                                {liveStudent.name.charAt(0)}
-                            </div>
-                            <div>
-                                <h1 style={{
-                                    fontSize: 'clamp(1.6rem, 4vw, 2.2rem)',
-                                    fontWeight: 800,
-                                    marginBottom: '0.2rem',
-                                    letterSpacing: '-0.02em'
-                                }}>
-                                    Welcome, {liveStudent.name.split(' ')[0]}!
-                                </h1>
-                                <p style={{ opacity: 0.85, fontSize: '1rem' }}>
-                                    {liveStudent.grade}  •  ID: {liveStudent.id}
-                                </p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={handleLogout}
-                            className="btn"
-                            style={{
-                                background: 'rgba(255,255,255,0.15)',
-                                color: 'white',
-                                border: '2px solid rgba(255,255,255,0.4)',
-                                backdropFilter: 'blur(4px)'
-                            }}
-                        >
-                            <LogOut size={18} />
-                            Logout
-                        </button>
-                    </div>
-                </div>
-            </section>
+    const studentTabs = [
+        { id: 'overview', label: 'Dashboard', icon: BarChart3, desc: 'Your academic overview and quick stats.' },
+        { id: 'results', label: 'Term Results', icon: Award, desc: 'View your detailed grades and performance.' },
+        { id: 'attendance', label: 'Attendance Record', icon: Calendar, desc: 'Track your presence and absences.' },
+        { id: 'history', label: 'Previous Results', icon: BookMarked, desc: 'Review your historical academic performance.' },
+        { id: 'fees', label: 'Fee Status', icon: DollarSign, desc: 'Check your current fee payments.' }
+    ];
 
-            {/* ─── Navigation Tabs ─── */}
-            <section className="bg-white" style={{
-                borderBottom: '1px solid var(--color-gray-200)',
+    return (
+        <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)', background: '#f8fafc' }}>
+            {/* ── LEFT SIDEBAR ── */}
+            <aside style={{
+                width: '280px',
+                background: 'linear-gradient(180deg, #1e3a5f 0%, #0f172a 100%)',
+                borderRight: '1px solid #334155',
+                display: 'flex',
+                flexDirection: 'column',
                 position: 'sticky',
                 top: '80px',
-                zIndex: 10
+                height: 'calc(100vh - 80px)',
+                overflowY: 'auto',
+                boxShadow: '4px 0 15px -3px rgba(0, 0, 0, 0.1)'
             }}>
-                <div className="container">
-                    <div className="flex gap-1" style={{
-                        overflowX: 'auto',
-                        padding: '0.5rem 0'
+                <div style={{ padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', borderBottom: '1px solid #334155' }}>
+                    <div style={{
+                        width: '72px', height: '72px', borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '2rem', fontWeight: 800, color: 'white',
+                        border: '3px solid rgba(255,255,255,0.2)',
+                        boxShadow: '0 8px 16px rgba(59, 130, 246, 0.3)'
                     }}>
-                        {[
-                            { id: 'overview', label: 'Overview', icon: BarChart3 },
-                            { id: 'results', label: 'Results', icon: Award },
-                            { id: 'attendance', label: 'Attendance', icon: Calendar },
-                            { id: 'history', label: 'Previous Results', icon: BookMarked },
-                            { id: 'fees', label: 'Fee Status', icon: DollarSign }
-                        ].map((tab) => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className="flex gap-2"
-                                style={{
-                                    padding: '0.75rem 1.5rem',
-                                    fontWeight: 'var(--font-weight-semibold)',
-                                    color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-gray-600)',
-                                    borderBottom: activeTab === tab.id ? '3px solid var(--color-primary)' : '3px solid transparent',
-                                    transition: 'all var(--transition-base)',
-                                    whiteSpace: 'nowrap',
-                                    alignItems: 'center'
-                                }}
-                            >
-                                <tab.icon size={18} />
-                                {tab.label}
-                            </button>
-                        ))}
+                        {liveStudent.name.charAt(0)}
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontWeight: 800, fontSize: '1.25rem', color: '#f8fafc' }}>{liveStudent.name.split(' ')[0]}</div>
+                        <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>{liveStudent.grade} • ID: {liveStudent.id}</div>
                     </div>
                 </div>
-            </section>
 
-            {/* ─── Content ─── */}
-            <section className="section">
-                <div className="container">
+                <nav style={{ padding: '1.25rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <div style={{ margin: '0.5rem 0 0.5rem 1.25rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px' }}>Menu</div>
+
+                    {studentTabs.map((tab, idx) => {
+                        const tabColors = [
+                            { bg: 'linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)', shadow: 'rgba(37, 99, 235, 0.4)' },
+                            { bg: 'linear-gradient(90deg, #10b981 0%, #059669 100%)', shadow: 'rgba(16, 185, 129, 0.4)' },
+                            { bg: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)', shadow: 'rgba(245, 158, 11, 0.4)' },
+                            { bg: 'linear-gradient(90deg, #8b5cf6 0%, #7c3aed 100%)', shadow: 'rgba(139, 92, 246, 0.4)' },
+                            { bg: 'linear-gradient(90deg, #14b8a6 0%, #0d9488 100%)', shadow: 'rgba(20, 184, 166, 0.4)' }
+                        ];
+                        const c = tabColors[idx % tabColors.length];
+                        const isActive = activeTab === tab.id;
+
+                        return (
+                            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="btn hover-scale" style={{
+                                justifyContent: 'flex-start',
+                                padding: '0.85rem 1.25rem',
+                                background: isActive ? c.bg : 'transparent',
+                                color: isActive ? 'white' : '#94a3b8',
+                                fontWeight: isActive ? 700 : 500,
+                                border: 'none',
+                                boxShadow: isActive ? `0 4px 12px -3px ${c.shadow}` : 'none',
+                                borderRadius: '12px',
+                                width: '100%',
+                                textAlign: 'left',
+                                transition: 'all 0.2s ease'
+                            }}>
+                                <tab.icon size={20} style={{ marginRight: '0.75rem', opacity: isActive ? 1 : 0.7 }} /> {tab.label}
+                            </button>
+                        );
+                    })}
+                </nav>
+
+                <div style={{ marginTop: 'auto', padding: '1.5rem', borderTop: '1px solid #334155' }}>
+                    <button onClick={handleLogout} className="btn hover-scale" style={{ width: '100%', justifyContent: 'center', background: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '10px' }}>
+                        <LogOut size={16} /> Logout
+                    </button>
+                </div>
+            </aside>
+
+            {/* ── MAIN CONTENT ── */}
+            <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+
+                {/* Top Header Row representing the current Active Tab */}
+                <header style={{
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    backdropFilter: 'blur(12px)',
+                    borderBottom: '1px solid #e2e8f0',
+                    padding: '1.5rem 2.5rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 5
+                }}>
+                    <div>
+                        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <span style={{ color: '#2563eb' }}>{studentTabs.find(t => t.id === activeTab)?.label}</span>
+                        </h1>
+                        <p style={{ color: '#64748b', margin: '0.25rem 0 0', fontSize: '0.95rem' }}>
+                            {studentTabs.find(t => t.id === activeTab)?.desc}
+                        </p>
+                    </div>
+                </header>
+
+                <div style={{ padding: '2.5rem', width: '100%', maxWidth: '1400px', margin: '0 auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
 
                     {/* ════════════════ OVERVIEW TAB ════════════════ */}
                     {activeTab === 'overview' && (
@@ -922,7 +920,7 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
                         );
                     })()}
                 </div>
-            </section>
+            </main>
         </div>
     );
 };
