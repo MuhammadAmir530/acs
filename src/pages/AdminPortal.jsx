@@ -2529,7 +2529,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                 {activeTab === 'marks' && (
                                     <GradebookTab
                                         students={students} selectedClass={selectedClass} setSelectedClass={setSelectedClass} sectionClasses={sectionClasses}
-                                        TERMS={classTerms} SUBJECTS={classSubjects} WEIGHTS={WEIGHTS}
+                                        TERMS={classTerms} SUBJECTS={SUBJECTS} WEIGHTS={WEIGHTS}
                                         gbTerm={gbTerm} setGbTerm={setGbTerm} gbGenderTab={gbGenderTab} setGbGenderTab={setGbGenderTab}
                                         gbEdits={gbEdits} setGbEdits={setGbEdits} gbSaving={gbSaving}
                                         showGbStats={showGbStats} setShowGbStats={setShowGbStats}

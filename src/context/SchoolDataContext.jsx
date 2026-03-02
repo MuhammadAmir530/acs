@@ -100,12 +100,16 @@ export const SchoolDataProvider = ({ children }) => {
             }));
 
             if (metaMap['CLASSES']) setClasses(metaMap['CLASSES']);
+            const currentClasses = metaMap['CLASSES'] || LOCAL_CLASSES;
+
             if (metaMap['SUBJECTS']) {
                 // Support both old flat-array format and new per-class object format
                 const loaded = metaMap['SUBJECTS'];
                 if (Array.isArray(loaded)) {
-                    // Legacy: was a global list — keep it but don't migrate automatically
-                    setSubjects({});
+                    // Legacy: was a global list, duplicate it across all current classes
+                    const legacyMap = {};
+                    currentClasses.forEach(c => legacyMap[c] = loaded);
+                    setSubjects(legacyMap);
                 } else {
                     setSubjects(loaded);
                 }
@@ -113,8 +117,10 @@ export const SchoolDataProvider = ({ children }) => {
             if (metaMap['TERMS']) {
                 const loadedTerms = metaMap['TERMS'];
                 if (Array.isArray(loadedTerms)) {
-                    // Legacy: flat array. Provide empty object so the UI can prompt class-specific updates.
-                    setTerms({});
+                    // Legacy: flat array, duplicate across all classes
+                    const legacyMap = {};
+                    currentClasses.forEach(c => legacyMap[c] = loadedTerms);
+                    setTerms(legacyMap);
                 } else {
                     setTerms(loadedTerms);
                 }

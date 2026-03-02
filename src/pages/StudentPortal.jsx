@@ -10,7 +10,8 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
     const { schoolData, TERMS } = useSchoolData();
     const [activeTab, setActiveTab] = useState('overview');
     const [selectedPrevTerm, setSelectedPrevTerm] = useState(0);
-    const [selectedTerm, setSelectedTerm] = useState(TERMS[0] || '');
+    const classTerms = (TERMS && !Array.isArray(TERMS) ? (TERMS[student?.grade] || []) : (TERMS || []));
+    const [selectedTerm, setSelectedTerm] = useState(classTerms[0] || '');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const handleLogout = () => {
@@ -384,7 +385,7 @@ const StudentPortal = ({ student, setIsLoggedIn, setCurrentPage, setLoggedInStud
 
                             {/* Term selector */}
                             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                                {TERMS.map(t => {
+                                {classTerms.map(t => {
                                     const termRes = getTermResults(t);
                                     const hasData = termRes.length > 0;
                                     return (
