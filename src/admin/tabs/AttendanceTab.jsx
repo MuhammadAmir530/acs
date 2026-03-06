@@ -59,7 +59,10 @@ ${htmlBody}
   <span>Generated: ${new Date().toLocaleString()}</span>
   <span>ACS School Management System</span>
 </div>
-<script>window.onload=()=>{window.print();}<\/script>
+<div style="text-align:center;margin:20px 0">
+  <button onclick="window.print()" style="background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;border:none;padding:12px 32px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 12px rgba(37,99,235,0.3)">🖨 Print Report</button>
+</div>
+<style>@media print{button{display:none!important}}</style>
 </body>
 </html>`);
     win.document.close();
