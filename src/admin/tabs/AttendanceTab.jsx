@@ -65,6 +65,13 @@ ${htmlBody}
     win.document.close();
 }
 
+/* Numeric-aware class name sort: "9th A" before "10th B" */
+function classSort(a, b) {
+    const numA = parseInt((a || '').match(/\d+/)?.[0] || '999');
+    const numB = parseInt((b || '').match(/\d+/)?.[0] || '999');
+    return numA !== numB ? numA - numB : (a || '').localeCompare(b || '');
+}
+
 /* ─────────────────────────────────────────────
    BUILD REPORT HTML HELPERS
 ───────────────────────────────────────────── */
@@ -334,7 +341,7 @@ function buildStatusSectionHTML(students, sections, date, schoolName, statusType
     (sections || []).forEach(sec => {
         const secStudents = students.filter(s => (sec.classes || []).includes(s.grade));
         const secFiltered = secStudents.filter(s => (s.attendance?.records || []).some(r => r.date === date && r.status === statusType))
-            .sort((a, b) => (a.grade || '').localeCompare(b.grade || '') || a.id.localeCompare(b.id, undefined, { numeric: true }));
+            .sort((a, b) => classSort(a.grade, b.grade) || a.id.localeCompare(b.id, undefined, { numeric: true }));
         const secPresent = secStudents.filter(s => (s.attendance?.records || []).some(r => r.date === date && r.status === 'present')).length;
         const secRate = secStudents.length > 0 ? Math.round((secPresent / secStudents.length) * 100) : 0;
 
@@ -353,7 +360,7 @@ function buildStatusSectionHTML(students, sections, date, schoolName, statusType
                 if (!byClass[cls]) byClass[cls] = [];
                 byClass[cls].push(s);
             });
-            Object.keys(byClass).sort().forEach(cls => {
+            Object.keys(byClass).sort(classSort).forEach(cls => {
                 const list = byClass[cls];
                 const classTotal = secStudents.filter(s => s.grade === cls).length;
                 sectionBlocks += `<p style="font-size:11px;font-weight:700;color:#475569;margin:10px 0 4px;padding-left:14px">${cls} — ${list.length} ${label.toLowerCase()} / ${classTotal} total</p>`;
@@ -378,7 +385,7 @@ function buildStatusCollegeHTML(students, date, schoolName, statusType) {
     const label = statusType === 'absent' ? 'Absent' : 'Present';
     const allFiltered = students
         .filter(s => (s.attendance?.records || []).some(r => r.date === date && r.status === statusType))
-        .sort((a, b) => (a.grade || '').localeCompare(b.grade || '') || a.id.localeCompare(b.id, undefined, { numeric: true }));
+        .sort((a, b) => classSort(a.grade, b.grade) || a.id.localeCompare(b.id, undefined, { numeric: true }));
     const totalStudents = students.length;
     const totalPresent = students.filter(s => (s.attendance?.records || []).some(r => r.date === date && r.status === 'present')).length;
 
@@ -391,7 +398,7 @@ function buildStatusCollegeHTML(students, date, schoolName, statusType) {
     });
 
     let classSections = '';
-    Object.keys(grouped).sort().forEach(cls => {
+    Object.keys(grouped).sort(classSort).forEach(cls => {
         const list = grouped[cls];
         const classTotal = students.filter(s => s.grade === cls).length;
         classSections += `<div class="section-title">${cls} — ${list.length} ${label.toLowerCase()} out of ${classTotal}</div>`;
