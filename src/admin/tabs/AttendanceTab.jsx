@@ -271,56 +271,120 @@ ${monthRecs.length === 0
             : `<table><thead><tr><th>#</th><th>Date</th><th>Day</th><th>Status</th></tr></thead><tbody>${recRows}</tbody></table>`}`;
 }
 
-/* ── Absent students — single class ─────── */
-function buildAbsentClassHTML(students, className, date, schoolName) {
+/* ── Generalized status report (present OR absent) ── */
+function studentRow(s, i, statusType) {
+    const pct = s.attendance?.percentage || 0;
+    const badgeClass = statusType === 'absent' ? 'absent' : 'present';
+    return `<tr>
+      <td>${i + 1}</td>
+      <td><strong>${s.name}</strong></td>
+      <td style="color:#64748b">${s.id}</td>
+      <td>${s.grade || '—'}</td>
+      <td>${s.admissions?.[0]?.gender || '—'}</td>
+      <td>${s.admissions?.[0]?.fatherName || '—'}</td>
+      <td>${s.admissions?.[0]?.contact || '—'}</td>
+      <td><span class="badge ${badgeClass}">${pct}%</span></td>
+    </tr>`;
+}
+
+function statusTable(list, statusType) {
+    if (list.length === 0) {
+        const msg = statusType === 'absent'
+            ? '✓ All students are present today!'
+            : 'No students marked present for this date.';
+        const color = statusType === 'absent' ? '#16a34a' : '#b45309';
+        return `<p style="color:${color};font-weight:700;font-size:14px;text-align:center;padding:20px">${msg}</p>`;
+    }
+    const rows = list.map((s, i) => studentRow(s, i, statusType)).join('');
+    return `<table>
+  <thead><tr><th>#</th><th>Student Name</th><th>ID</th><th>Class</th><th>Gender</th><th>Father Name</th><th>Contact</th><th>Overall %</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>`;
+}
+
+/* ── Status report — single class ────── */
+function buildStatusClassHTML(students, className, date, schoolName, statusType) {
+    const label = statusType === 'absent' ? 'Absent' : 'Present';
     const classStudents = students
         .filter(s => s.grade === className)
         .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
-    const absentList = classStudents.filter(s => (s.attendance?.records || []).some(r => r.date === date && r.status === 'absent'));
-
-    const rows = absentList.map((s, i) => {
-        const pct = s.attendance?.percentage || 0;
-        const color = pct >= 90 ? '#16a34a' : pct >= 75 ? '#2563eb' : pct >= 60 ? '#d97706' : '#dc2626';
-        return `<tr>
-          <td>${i + 1}</td>
-          <td><strong>${s.name}</strong></td>
-          <td style="color:#64748b">${s.id}</td>
-          <td>${s.admissions?.[0]?.gender || '—'}</td>
-          <td>${s.admissions?.[0]?.fatherName || '—'}</td>
-          <td>${s.admissions?.[0]?.contact || '—'}</td>
-          <td><span class="badge absent">${pct}%</span></td>
-        </tr>`;
-    }).join('');
+    const filtered = classStudents.filter(s => (s.attendance?.records || []).some(r => r.date === date && r.status === statusType));
+    const rate = classStudents.length > 0 ? Math.round(((statusType === 'absent' ? classStudents.length - filtered.length : filtered.length) / classStudents.length) * 100) : 0;
 
     return `
-${schoolHeader(schoolName, 'Absent Students Report', `Class: ${className} | Date: ${date}`)}
+${schoolHeader(schoolName, `${label} Students Report`, `Class: ${className} | Date: ${date}`)}
 <div class="meta-grid">
   <div class="meta-card"><div class="val">${classStudents.length}</div><div class="lbl">Total Students</div></div>
-  <div class="meta-card green"><div class="val">${classStudents.length - absentList.length}</div><div class="lbl">Present</div></div>
-  <div class="meta-card red"><div class="val">${absentList.length}</div><div class="lbl">Absent</div></div>
-  <div class="meta-card ${absentList.length === 0 ? 'green' : 'red'}"><div class="val">${classStudents.length > 0 ? Math.round(((classStudents.length - absentList.length) / classStudents.length) * 100) : 0}%</div><div class="lbl">Attendance Rate</div></div>
+  <div class="meta-card green"><div class="val">${statusType === 'absent' ? classStudents.length - filtered.length : filtered.length}</div><div class="lbl">Present</div></div>
+  <div class="meta-card red"><div class="val">${statusType === 'absent' ? filtered.length : classStudents.length - filtered.length}</div><div class="lbl">Absent</div></div>
+  <div class="meta-card ${rate >= 75 ? 'green' : 'red'}"><div class="val">${rate}%</div><div class="lbl">Attendance Rate</div></div>
 </div>
-<div class="section-title">⚠ Absent Students — ${className} (${date})</div>
-${absentList.length === 0
-            ? '<p style="color:#16a34a;font-weight:700;font-size:14px;text-align:center;padding:20px">✓ All students are present today!</p>'
-            : `<table>
-  <thead><tr><th>#</th><th>Student Name</th><th>ID</th><th>Gender</th><th>Father Name</th><th>Contact</th><th>Overall %</th></tr></thead>
-  <tbody>${rows}</tbody>
-</table>`}`;
+<div class="section-title">${statusType === 'absent' ? '⚠' : '✓'} ${label} Students — ${className} (${date})</div>
+${statusTable(filtered, statusType)}`;
 }
 
-/* ── Absent students — whole college ────── */
-function buildAbsentCollegeHTML(students, sectionClasses, date, schoolName) {
-    const allAbsent = students
-        .filter(s => (s.attendance?.records || []).some(r => r.date === date && r.status === 'absent'))
-        .sort((a, b) => (a.grade || '').localeCompare(b.grade || '') || a.id.localeCompare(b.id, undefined, { numeric: true }));
+/* ── Status report — section-wise ────── */
+function buildStatusSectionHTML(students, sections, date, schoolName, statusType) {
+    const label = statusType === 'absent' ? 'Absent' : 'Present';
+    const allFiltered = students.filter(s => (s.attendance?.records || []).some(r => r.date === date && r.status === statusType));
+    const totalStudents = students.length;
+    const totalPresent = students.filter(s => (s.attendance?.records || []).some(r => r.date === date && r.status === 'present')).length;
 
+    let sectionBlocks = '';
+    (sections || []).forEach(sec => {
+        const secStudents = students.filter(s => (sec.classes || []).includes(s.grade));
+        const secFiltered = secStudents.filter(s => (s.attendance?.records || []).some(r => r.date === date && r.status === statusType))
+            .sort((a, b) => (a.grade || '').localeCompare(b.grade || '') || a.id.localeCompare(b.id, undefined, { numeric: true }));
+        const secPresent = secStudents.filter(s => (s.attendance?.records || []).some(r => r.date === date && r.status === 'present')).length;
+        const secRate = secStudents.length > 0 ? Math.round((secPresent / secStudents.length) * 100) : 0;
+
+        sectionBlocks += `
+<div class="section-title">📚 ${sec.name || 'Section'} — ${secFiltered.length} ${label.toLowerCase()} out of ${secStudents.length} (${secRate}% attendance)</div>`;
+
+        if (secFiltered.length === 0) {
+            sectionBlocks += statusType === 'absent'
+                ? '<p style="color:#16a34a;font-weight:600;font-size:12px;padding:8px 14px">✓ No absentees in this section</p>'
+                : '<p style="color:#b45309;font-weight:600;font-size:12px;padding:8px 14px">No students marked present in this section</p>';
+        } else {
+            // Sub-group by class within section
+            const byClass = {};
+            secFiltered.forEach(s => {
+                const cls = s.grade || 'Unassigned';
+                if (!byClass[cls]) byClass[cls] = [];
+                byClass[cls].push(s);
+            });
+            Object.keys(byClass).sort().forEach(cls => {
+                const list = byClass[cls];
+                const classTotal = secStudents.filter(s => s.grade === cls).length;
+                sectionBlocks += `<p style="font-size:11px;font-weight:700;color:#475569;margin:10px 0 4px;padding-left:14px">${cls} — ${list.length} ${label.toLowerCase()} / ${classTotal} total</p>`;
+                sectionBlocks += statusTable(list, statusType);
+            });
+        }
+    });
+
+    return `
+${schoolHeader(schoolName, `Section-Wise ${label} Report`, `Date: ${date} | All Sections`)}
+<div class="meta-grid">
+  <div class="meta-card"><div class="val">${totalStudents}</div><div class="lbl">Total Enrolled</div></div>
+  <div class="meta-card green"><div class="val">${totalPresent}</div><div class="lbl">Present</div></div>
+  <div class="meta-card red"><div class="val">${totalStudents - totalPresent}</div><div class="lbl">Absent</div></div>
+  <div class="meta-card ${totalStudents > 0 && ((totalPresent / totalStudents) * 100) >= 75 ? 'green' : 'red'}"><div class="val">${totalStudents > 0 ? Math.round((totalPresent / totalStudents) * 100) : 0}%</div><div class="lbl">College Attendance</div></div>
+</div>
+${sectionBlocks}`;
+}
+
+/* ── Status report — whole college ────── */
+function buildStatusCollegeHTML(students, date, schoolName, statusType) {
+    const label = statusType === 'absent' ? 'Absent' : 'Present';
+    const allFiltered = students
+        .filter(s => (s.attendance?.records || []).some(r => r.date === date && r.status === statusType))
+        .sort((a, b) => (a.grade || '').localeCompare(b.grade || '') || a.id.localeCompare(b.id, undefined, { numeric: true }));
     const totalStudents = students.length;
     const totalPresent = students.filter(s => (s.attendance?.records || []).some(r => r.date === date && r.status === 'present')).length;
 
     // Group by class
     const grouped = {};
-    allAbsent.forEach(s => {
+    allFiltered.forEach(s => {
         const cls = s.grade || 'Unassigned';
         if (!grouped[cls]) grouped[cls] = [];
         grouped[cls].push(s);
@@ -330,37 +394,24 @@ function buildAbsentCollegeHTML(students, sectionClasses, date, schoolName) {
     Object.keys(grouped).sort().forEach(cls => {
         const list = grouped[cls];
         const classTotal = students.filter(s => s.grade === cls).length;
-        const rows = list.map((s, i) => {
-            const pct = s.attendance?.percentage || 0;
-            return `<tr>
-              <td>${i + 1}</td>
-              <td><strong>${s.name}</strong></td>
-              <td style="color:#64748b">${s.id}</td>
-              <td>${s.admissions?.[0]?.gender || '—'}</td>
-              <td>${s.admissions?.[0]?.fatherName || '—'}</td>
-              <td>${s.admissions?.[0]?.contact || '—'}</td>
-              <td><span class="badge absent">${pct}%</span></td>
-            </tr>`;
-        }).join('');
-
-        classSections += `
-<div class="section-title">${cls} — ${list.length} absent out of ${classTotal}</div>
-<table>
-  <thead><tr><th>#</th><th>Student Name</th><th>ID</th><th>Gender</th><th>Father Name</th><th>Contact</th><th>Overall %</th></tr></thead>
-  <tbody>${rows}</tbody>
-</table>`;
+        classSections += `<div class="section-title">${cls} — ${list.length} ${label.toLowerCase()} out of ${classTotal}</div>`;
+        classSections += statusTable(list, statusType);
     });
 
+    const emptyMsg = statusType === 'absent'
+        ? '✓ No absentees across the entire college today!'
+        : 'No students marked present for this date.';
+
     return `
-${schoolHeader(schoolName, 'College-Wide Absent Report', `Date: ${date} | All Classes`)}
+${schoolHeader(schoolName, `College-Wide ${label} Report`, `Date: ${date} | All Classes`)}
 <div class="meta-grid">
   <div class="meta-card"><div class="val">${totalStudents}</div><div class="lbl">Total Enrolled</div></div>
   <div class="meta-card green"><div class="val">${totalPresent}</div><div class="lbl">Present Today</div></div>
-  <div class="meta-card red"><div class="val">${allAbsent.length}</div><div class="lbl">Absent Today</div></div>
+  <div class="meta-card red"><div class="val">${totalStudents - totalPresent}</div><div class="lbl">Absent Today</div></div>
   <div class="meta-card ${totalStudents > 0 && ((totalPresent / totalStudents) * 100) >= 75 ? 'green' : 'red'}"><div class="val">${totalStudents > 0 ? Math.round((totalPresent / totalStudents) * 100) : 0}%</div><div class="lbl">College Attendance</div></div>
 </div>
-${allAbsent.length === 0
-            ? '<p style="color:#16a34a;font-weight:700;font-size:14px;text-align:center;padding:20px">✓ No absentees across the entire college today!</p>'
+${allFiltered.length === 0
+            ? `<p style="color:${statusType === 'absent' ? '#16a34a' : '#b45309'};font-weight:700;font-size:14px;text-align:center;padding:20px">${emptyMsg}</p>`
             : classSections}`;
 }
 
@@ -371,7 +422,7 @@ const AttendanceTab = ({
     attDateFilter, setAttDateFilter,
     markAttendance, removeAttendanceRecord, exportAttendanceExcel,
     fetchData, showSaveMessage, openConfirm,
-    schoolName,
+    schoolName, sections,
 }) => {
     const [genderTab, setGenderTab] = useState('all');
     const [showPrintMenu, setShowPrintMenu] = useState(false);
@@ -464,10 +515,6 @@ const AttendanceTab = ({
             const st = students.find(s => s.id === selectedStudentId);
             if (!st) return alert('Please select a student.');
             openPrintWindow(buildStudentMonthlyHTML(st, yr, mo, sName), `${st.name} - Monthly Report`);
-        } else if (printMode === 'absent-class') {
-            openPrintWindow(buildAbsentClassHTML(students, selectedClass, filterDate, sName), `Absent Students - ${selectedClass}`);
-        } else if (printMode === 'absent-college') {
-            openPrintWindow(buildAbsentCollegeHTML(students, sectionClasses, filterDate, sName), 'College-Wide Absent Report');
         }
         setPrintMode(null);
     };
@@ -574,7 +621,7 @@ const AttendanceTab = ({
                             <Printer size={16} /> Print <ChevronDown size={14} />
                         </button>
                         {showPrintMenu && (
-                            <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, minWidth: 230, overflow: 'hidden' }}>
+                            <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, minWidth: 260, overflow: 'hidden', maxHeight: '70vh', overflowY: 'auto' }}>
                                 <div style={{ padding: '0.5rem 0.75rem', fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc' }}>Class Reports</div>
                                 {[
                                     { id: 'daily-class', label: '📋 Daily Class Report', sub: `${filterDate}` },
@@ -601,21 +648,38 @@ const AttendanceTab = ({
                                         <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{opt.sub}</div>
                                     </button>
                                 ))}
-                                <div style={{ borderTop: '1px solid #f1f5f9', padding: '0.5rem 0.75rem', fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc' }}>Absent Reports</div>
-                                <button onClick={() => { openPrintWindow(buildAbsentClassHTML(students, selectedClass, filterDate, schoolName || 'School'), `Absent - ${selectedClass}`); setShowPrintMenu(false); }}
-                                    style={{ display: 'block', width: '100%', padding: '0.6rem 0.9rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' }}
-                                    onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-                                    <div style={{ fontWeight: 600, color: '#dc2626', fontSize: '0.88rem' }}>🚫 Absent — This Class</div>
-                                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{selectedClass} on {filterDate}</div>
-                                </button>
-                                <button onClick={() => { openPrintWindow(buildAbsentCollegeHTML(students, sectionClasses, filterDate, schoolName || 'School'), 'College-Wide Absent Report'); setShowPrintMenu(false); }}
-                                    style={{ display: 'block', width: '100%', padding: '0.6rem 0.9rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' }}
-                                    onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-                                    <div style={{ fontWeight: 600, color: '#dc2626', fontSize: '0.88rem' }}>🏫 Absent — Whole College</div>
-                                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>All classes on {filterDate}</div>
-                                </button>
+
+                                {/* ── ABSENT REPORTS ── */}
+                                <div style={{ borderTop: '1px solid #f1f5f9', padding: '0.5rem 0.75rem', fontSize: '0.7rem', fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#fef2f2' }}>🚫 Absent Reports</div>
+                                {[
+                                    { label: 'Absent — This Class', sub: `${selectedClass} on ${filterDate}`, action: () => openPrintWindow(buildStatusClassHTML(students, selectedClass, filterDate, schoolName || 'School', 'absent'), `Absent - ${selectedClass}`) },
+                                    { label: 'Absent — Section Wise', sub: `Matric / Inter on ${filterDate}`, action: () => openPrintWindow(buildStatusSectionHTML(students, sections, filterDate, schoolName || 'School', 'absent'), 'Section-Wise Absent Report') },
+                                    { label: 'Absent — Whole College', sub: `All classes on ${filterDate}`, action: () => openPrintWindow(buildStatusCollegeHTML(students, filterDate, schoolName || 'School', 'absent'), 'College-Wide Absent Report') },
+                                ].map((opt, i) => (
+                                    <button key={`abs-${i}`} onClick={() => { opt.action(); setShowPrintMenu(false); }}
+                                        style={{ display: 'block', width: '100%', padding: '0.6rem 0.9rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                                        <div style={{ fontWeight: 600, color: '#dc2626', fontSize: '0.88rem' }}>{opt.label}</div>
+                                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{opt.sub}</div>
+                                    </button>
+                                ))}
+
+                                {/* ── PRESENT REPORTS ── */}
+                                <div style={{ borderTop: '1px solid #f1f5f9', padding: '0.5rem 0.75rem', fontSize: '0.7rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f0fdf4' }}>✓ Present Reports</div>
+                                {[
+                                    { label: 'Present — This Class', sub: `${selectedClass} on ${filterDate}`, action: () => openPrintWindow(buildStatusClassHTML(students, selectedClass, filterDate, schoolName || 'School', 'present'), `Present - ${selectedClass}`) },
+                                    { label: 'Present — Section Wise', sub: `Matric / Inter on ${filterDate}`, action: () => openPrintWindow(buildStatusSectionHTML(students, sections, filterDate, schoolName || 'School', 'present'), 'Section-Wise Present Report') },
+                                    { label: 'Present — Whole College', sub: `All classes on ${filterDate}`, action: () => openPrintWindow(buildStatusCollegeHTML(students, filterDate, schoolName || 'School', 'present'), 'College-Wide Present Report') },
+                                ].map((opt, i) => (
+                                    <button key={`prs-${i}`} onClick={() => { opt.action(); setShowPrintMenu(false); }}
+                                        style={{ display: 'block', width: '100%', padding: '0.6rem 0.9rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                                        <div style={{ fontWeight: 600, color: '#16a34a', fontSize: '0.88rem' }}>{opt.label}</div>
+                                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{opt.sub}</div>
+                                    </button>
+                                ))}
                             </div>
                         )}
                     </div>

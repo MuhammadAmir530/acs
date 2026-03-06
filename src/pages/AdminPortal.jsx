@@ -2656,6 +2656,7 @@ const AdminPortal = ({ setIsAdmin, setCurrentPage }) => {
                                         exportAttendanceExcel={exportAttendanceExcel} fetchData={fetchData}
                                         showSaveMessage={showSaveMessage} openConfirm={openConfirm}
                                         schoolName={schoolData?.name}
+                                        sections={SECTIONS}
                                     />
                                 )}
 
